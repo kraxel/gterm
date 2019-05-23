@@ -69,6 +69,16 @@ Config file key: foreground.
 Set the background color
 .br
 Config file key: background.
+.TP
+.BI -name " profile"
+Set profile.  gterm will read settings from a [profile] section in the
+config file (if present).  This mimics xterm's behavior of changing
+application name / application class when reading resources, so you
+could have different config sets in ~/.Xdefaults which are selected
+that way.
+.TP
+.BI -class " profile"
+Alias for -name.
 \#
 \#
 .SH "CONFIG FILE"

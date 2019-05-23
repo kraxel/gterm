@@ -26,6 +26,7 @@
 #define GTERM_CFG_KEY_CURSOR_COLOR      "cursorColor"
 #define GTERM_CFG_KEY_FOREGROUND        "foreground"
 #define GTERM_CFG_KEY_BACKGROUND        "background"
+#define GTERM_CFG_KEY_PROFILE           "profile"
 
 typedef struct gterm_opt {
     char *opt;
@@ -48,6 +49,8 @@ static const gterm_opt gterm_opts[] = {
     { .opt = "cr",            .key = GTERM_CFG_KEY_CURSOR_COLOR  },
     { .opt = "fg",            .key = GTERM_CFG_KEY_FOREGROUND    },
     { .opt = "bg",            .key = GTERM_CFG_KEY_BACKGROUND    },
+    { .opt = "name",          .key = GTERM_CFG_KEY_PROFILE       },
+    { .opt = "class",         .key = GTERM_CFG_KEY_PROFILE       },
 
     { .opt = "bc",            .key = GTERM_CFG_KEY_CURSOR_BLINK, .is_bool = true  },
 };
@@ -79,11 +82,21 @@ static void gterm_cfg_set(GKeyFile *cfg, char *key, char *value)
 
 static char *gterm_cfg_get(GKeyFile *cfg, char *key)
 {
+    char *profile;
     char *value;
+
+    profile = g_key_file_get_string(cfg, GTERM_CFG_GROUP_CMDLINE,
+                                    GTERM_CFG_KEY_PROFILE, NULL);
 
     value = g_key_file_get_string(cfg, GTERM_CFG_GROUP_CMDLINE, key, NULL);
     if (value)
         return value;
+
+    if (profile) {
+        value = g_key_file_get_string(cfg, profile, key, NULL);
+        if (value)
+            return value;
+    }
 
     value = g_key_file_get_string(cfg, GTERM_CFG_GROUP_DEFAULT, key, NULL);
     if (value)
