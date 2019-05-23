@@ -21,6 +21,7 @@
 #define GTERM_CFG_KEY_FONT_FACE         "faceName"
 #define GTERM_CFG_KEY_FONT_SIZE         "faceSize"
 #define GTERM_CFG_KEY_GEOMETRY          "geometry"
+#define GTERM_CFG_KEY_TITLE             "title"
 
 typedef struct gterm_opt {
     char *opt;
@@ -32,6 +33,8 @@ static const gterm_opt gterm_opts[] = {
     { .opt = "fa",            .key = GTERM_CFG_KEY_FONT_FACE },
     { .opt = "fs",            .key = GTERM_CFG_KEY_FONT_SIZE },
     { .opt = "geometry",      .key = GTERM_CFG_KEY_GEOMETRY  },
+    { .opt = "T",             .key = GTERM_CFG_KEY_TITLE     },
+    { .opt = "title",         .key = GTERM_CFG_KEY_TITLE     },
 };
 
 static const gterm_opt *gterm_opt_find(char *arg)
@@ -176,6 +179,16 @@ static void gterm_window_destroy(GtkWidget *widget, gpointer data)
     gtk_main_quit();
 }
 
+static void gterm_window_configure(gterm *gt)
+{
+    char *str;
+
+    str = gterm_cfg_get(gt->cfg, GTERM_CFG_KEY_TITLE);
+    if (str) {
+        gtk_window_set_title(GTK_WINDOW(gt->window), str);
+    }
+}
+
 static gterm *gterm_new(GKeyFile *cfg)
 {
     gterm *gt = g_new0(gterm, 1);
@@ -185,6 +198,7 @@ static gterm *gterm_new(GKeyFile *cfg)
     gt->window = gtk_window_new(GTK_WINDOW_TOPLEVEL);
     g_signal_connect(G_OBJECT(gt->window), "destroy",
                      G_CALLBACK(gterm_window_destroy), gt);
+    gterm_window_configure(gt);
 
     gt->terminal = vte_terminal_new();
     g_signal_connect(G_OBJECT(gt->terminal), "child-exited",
