@@ -20,6 +20,7 @@
 
 #define GTERM_CFG_KEY_FONT_FACE         "faceName"
 #define GTERM_CFG_KEY_FONT_SIZE         "faceSize"
+#define GTERM_CFG_KEY_GEOMETRY          "geometry"
 
 typedef struct gterm_opt {
     char *opt;
@@ -30,6 +31,7 @@ typedef struct gterm_opt {
 static const gterm_opt gterm_opts[] = {
     { .opt = "fa",            .key = GTERM_CFG_KEY_FONT_FACE },
     { .opt = "fs",            .key = GTERM_CFG_KEY_FONT_SIZE },
+    { .opt = "geometry",      .key = GTERM_CFG_KEY_GEOMETRY  },
 };
 
 static const gterm_opt *gterm_opt_find(char *arg)
@@ -142,6 +144,8 @@ static void gterm_vte_configure(gterm *gt)
     char *fontdesc;
     char *fontname;
     char *fontsize;
+    char *str;
+    unsigned int cols, rows;
 
     fontname = gterm_cfg_get(gt->cfg, GTERM_CFG_KEY_FONT_FACE);
     fontsize = gterm_cfg_get(gt->cfg, GTERM_CFG_KEY_FONT_SIZE);
@@ -159,6 +163,11 @@ static void gterm_vte_configure(gterm *gt)
         font = pango_font_description_from_string(fontdesc);
         vte_terminal_set_font(VTE_TERMINAL(gt->terminal), font);
         g_free(fontdesc);
+    }
+
+    str = gterm_cfg_get(gt->cfg, GTERM_CFG_KEY_GEOMETRY);
+    if (str && sscanf(str, "%dx%d", &cols, &rows) == 2) {
+        vte_terminal_set_size(VTE_TERMINAL(gt->terminal), cols, rows);
     }
 }
 
