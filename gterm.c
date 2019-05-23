@@ -330,7 +330,7 @@ static void gterm_window_configure(gterm *gt)
 
     b = gterm_cfg_get_bool(gt->cfg, GTERM_CFG_KEY_FULLSCREEN);
     if (b == GTERM_BOOL_TRUE) {
-        gtk_window_fullscreen(GTK_WINDOW(gt->window));
+        gtk_check_menu_item_set_active(GTK_CHECK_MENU_ITEM(gt->fullscreen), true);
     }
 }
 
