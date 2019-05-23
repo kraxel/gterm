@@ -23,6 +23,7 @@
 #define GTERM_CFG_KEY_GEOMETRY          "geometry"
 #define GTERM_CFG_KEY_TITLE             "title"
 #define GTERM_CFG_KEY_CURSOR_BLINK      "cursorBlink"
+#define GTERM_CFG_KEY_CURSOR_COLOR      "cursorColor"
 
 typedef struct gterm_opt {
     char *opt;
@@ -37,11 +38,12 @@ typedef enum gterm_bool {
 } gterm_bool;
 
 static const gterm_opt gterm_opts[] = {
-    { .opt = "fa",            .key = GTERM_CFG_KEY_FONT_FACE },
-    { .opt = "fs",            .key = GTERM_CFG_KEY_FONT_SIZE },
-    { .opt = "geometry",      .key = GTERM_CFG_KEY_GEOMETRY  },
-    { .opt = "T",             .key = GTERM_CFG_KEY_TITLE     },
-    { .opt = "title",         .key = GTERM_CFG_KEY_TITLE     },
+    { .opt = "fa",            .key = GTERM_CFG_KEY_FONT_FACE     },
+    { .opt = "fs",            .key = GTERM_CFG_KEY_FONT_SIZE     },
+    { .opt = "geometry",      .key = GTERM_CFG_KEY_GEOMETRY      },
+    { .opt = "T",             .key = GTERM_CFG_KEY_TITLE         },
+    { .opt = "title",         .key = GTERM_CFG_KEY_TITLE         },
+    { .opt = "cr",            .key = GTERM_CFG_KEY_CURSOR_COLOR  },
 
     { .opt = "bc",            .key = GTERM_CFG_KEY_CURSOR_BLINK, .is_bool = true  },
 };
@@ -187,6 +189,7 @@ static void gterm_vte_configure(gterm *gt)
     char *fontsize;
     char *str;
     gterm_bool b;
+    GdkRGBA color;
     unsigned int cols, rows;
 
     fontname = gterm_cfg_get(gt->cfg, GTERM_CFG_KEY_FONT_FACE);
@@ -219,6 +222,12 @@ static void gterm_vte_configure(gterm *gt)
     } else if (b == GTERM_BOOL_FALSE) {
         vte_terminal_set_cursor_blink_mode(VTE_TERMINAL(gt->terminal),
                                            VTE_CURSOR_BLINK_OFF);
+    }
+
+    str = gterm_cfg_get(gt->cfg, GTERM_CFG_KEY_CURSOR_COLOR);
+    if (str) {
+        gdk_rgba_parse(&color, str);
+        vte_terminal_set_color_cursor(VTE_TERMINAL(gt->terminal), &color);
     }
 }
 
