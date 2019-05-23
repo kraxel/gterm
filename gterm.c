@@ -24,6 +24,8 @@
 #define GTERM_CFG_KEY_TITLE             "title"
 #define GTERM_CFG_KEY_CURSOR_BLINK      "cursorBlink"
 #define GTERM_CFG_KEY_CURSOR_COLOR      "cursorColor"
+#define GTERM_CFG_KEY_FOREGROUND        "foreground"
+#define GTERM_CFG_KEY_BACKGROUND        "background"
 
 typedef struct gterm_opt {
     char *opt;
@@ -44,6 +46,8 @@ static const gterm_opt gterm_opts[] = {
     { .opt = "T",             .key = GTERM_CFG_KEY_TITLE         },
     { .opt = "title",         .key = GTERM_CFG_KEY_TITLE         },
     { .opt = "cr",            .key = GTERM_CFG_KEY_CURSOR_COLOR  },
+    { .opt = "fg",            .key = GTERM_CFG_KEY_FOREGROUND    },
+    { .opt = "bg",            .key = GTERM_CFG_KEY_BACKGROUND    },
 
     { .opt = "bc",            .key = GTERM_CFG_KEY_CURSOR_BLINK, .is_bool = true  },
 };
@@ -228,6 +232,16 @@ static void gterm_vte_configure(gterm *gt)
     if (str) {
         gdk_rgba_parse(&color, str);
         vte_terminal_set_color_cursor(VTE_TERMINAL(gt->terminal), &color);
+    }
+    str = gterm_cfg_get(gt->cfg, GTERM_CFG_KEY_FOREGROUND);
+    if (str) {
+        gdk_rgba_parse(&color, str);
+        vte_terminal_set_color_foreground(VTE_TERMINAL(gt->terminal), &color);
+    }
+    str = gterm_cfg_get(gt->cfg, GTERM_CFG_KEY_BACKGROUND);
+    if (str) {
+        gdk_rgba_parse(&color, str);
+        vte_terminal_set_color_background(VTE_TERMINAL(gt->terminal), &color);
     }
 }
 
