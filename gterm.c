@@ -142,6 +142,16 @@ static void gterm_vte_child_exited(VteTerminal *vteterminal,
     gtk_main_quit();
 }
 
+static void gterm_vte_window_title_changed(VteTerminal *vteterminal,
+                                           gpointer     user_data)
+{
+    gterm *gt = user_data;
+    const char *str;
+
+    str = vte_terminal_get_window_title(VTE_TERMINAL(gt->terminal));
+    gtk_window_set_title(GTK_WINDOW(gt->window), str);
+}
+
 static void gterm_vte_configure(gterm *gt)
 {
     char *fontdesc;
@@ -203,6 +213,8 @@ static gterm *gterm_new(GKeyFile *cfg)
     gt->terminal = vte_terminal_new();
     g_signal_connect(G_OBJECT(gt->terminal), "child-exited",
                      G_CALLBACK(gterm_vte_child_exited), gt);
+    g_signal_connect(G_OBJECT(gt->terminal), "window-title-changed",
+                     G_CALLBACK(gterm_vte_window_title_changed), gt);
     gterm_vte_configure(gt);
 
     gtk_container_add(GTK_CONTAINER(gt->window), gt->terminal);
