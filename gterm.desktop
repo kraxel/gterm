@@ -1,0 +1,10 @@
+[Desktop Entry]
+Name=gterm
+GenericName=Terminal
+Comment=terminal application
+Exec=gterm
+Terminal=false
+Type=Application
+Encoding=UTF-8
+Icon=xterm-color
+Categories=System;TerminalEmulator;

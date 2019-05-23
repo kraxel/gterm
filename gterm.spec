@@ -30,3 +30,4 @@ ninja-build -C build-rpm install
 %doc README COPYING
 %{_bindir}/gterm
 %{_mandir}/man1/gterm.1*
+%{_prefix}/share/applications/gterm.desktop

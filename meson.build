@@ -13,3 +13,5 @@ executable('gterm',
            dependencies : [ gtk_dep, vte_dep ],
            install      : true)
 install_man('gterm.1')
+install_data('gterm.desktop',
+	     install_dir : 'share/applications')
