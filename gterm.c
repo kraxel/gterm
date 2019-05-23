@@ -136,6 +136,7 @@ typedef struct gterm {
     GtkWidget *popup;
 
     GtkWidget *fullscreen;
+    GtkWidget *bell;
 
     GKeyFile *cfg;
     GPid pid;
@@ -235,6 +236,7 @@ static void gterm_vte_configure(gterm *gt)
     char *fontsize;
     char *str;
     gterm_bool b;
+    gboolean state;
     GdkRGBA color;
     unsigned int cols, rows;
 
@@ -272,12 +274,14 @@ static void gterm_vte_configure(gterm *gt)
 
     b = gterm_cfg_get_bool(gt->cfg, GTERM_CFG_KEY_VISUAL_BELL);
     if (b == GTERM_BOOL_TRUE) {
-        vte_terminal_set_audible_bell(VTE_TERMINAL(gt->terminal),
-                                      false);
+        state = false;
     } else if (b == GTERM_BOOL_FALSE) {
-        vte_terminal_set_audible_bell(VTE_TERMINAL(gt->terminal),
-                                      true);
+        state = true;
+    } else {
+        state = vte_terminal_get_audible_bell(VTE_TERMINAL(gt->terminal));
     }
+    gtk_check_menu_item_set_active(GTK_CHECK_MENU_ITEM(gt->bell), state);
+    vte_terminal_set_audible_bell(VTE_TERMINAL(gt->terminal), state);
 
     str = gterm_cfg_get(gt->cfg, GTERM_CFG_KEY_CURSOR_COLOR);
     if (str) {
@@ -310,6 +314,16 @@ static void gterm_menu_fullscreen(GtkCheckMenuItem *item,
     }
 }
 
+static void gterm_menu_bell(GtkCheckMenuItem *item,
+                            gpointer user_data)
+{
+    gterm *gt = user_data;
+    gboolean state;
+
+    state = gtk_check_menu_item_get_active(item);
+    vte_terminal_set_audible_bell(VTE_TERMINAL(gt->terminal), state);
+}
+
 static void gterm_fill_menu(gterm *gt)
 {
     // GtkWidget *item;
@@ -318,6 +332,11 @@ static void gterm_fill_menu(gterm *gt)
     g_signal_connect(G_OBJECT(gt->fullscreen), "toggled",
                      G_CALLBACK(gterm_menu_fullscreen), gt);
     gtk_container_add(GTK_CONTAINER(gt->popup), gt->fullscreen);
+
+    gt->bell = gtk_check_menu_item_new_with_label("Audible bell");
+    g_signal_connect(G_OBJECT(gt->bell), "toggled",
+                     G_CALLBACK(gterm_menu_bell), gt);
+    gtk_container_add(GTK_CONTAINER(gt->popup), gt->bell);
 
     gtk_widget_show_all(gt->popup);
 }
