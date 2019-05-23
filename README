@@ -12,4 +12,6 @@ edit the ~/.config/gterm.conf config file, simliar to editing
 
 The number of supported config options is rather small right now, but
 is expected to grow over time to cover the most important ones.  It
-will probably never fully match the xterm feature set though.
+will probably never fully match the xterm feature set though.  Quite a
+few xterm features are pretty much obsolete these days and will simply
+not work with wayland, the x11 server side font rendering for example.
