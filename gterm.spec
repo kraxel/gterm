@@ -1,6 +1,6 @@
 Name:         gterm
 License:      GPLv2+
-Version:      0
+Version:      1.0
 Release:      1%{?dist}
 Summary:      terminal application
 Source:       %{name}-%{version}.tar.gz
