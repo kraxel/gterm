@@ -1,0 +1,47 @@
+.TH GTERM 1 "(c) 2019 Gerd Hoffmann" "GTERM" "terminal application"
+\#
+\#
+.SH NAME
+gterm - terminal application
+\#
+\#
+.SH SYNOPSIS
+.TP
+\fBgterm\fP [\fIoptions\fP]
+\#
+\#
+.SH DESCRIPTION
+.BR gterm
+is a terminal application.  Command line options are compatible with
+xterm, not all xterm options are actually implemented though.
+\#
+\#
+.SH OPTIONS
+.TP
+.B -e
+Command line to run within the terminal.  All arguments following this
+one are passed to the command started and will not be parsed, so this
+should be last on your command line.  If not specified a shell is
+started.
+.TP
+.B -fa <face>
+The font face to use.
+.TP
+.B -fs <size>
+The font size to use.
+\#
+\#
+.SH "CONFIG FILE"
+.BR gterm
+reads the configuration from the 
+.BR ~/.config/gterm.conf
+config file.  A "[default]" section holds the config options.
+\#
+\#
+.SH "SEE ALSO"
+.BR xterm(1),
+\#
+\#
+.SH AUTHOR
+Gerd Hoffmann
+.BR <gerd@kraxel.org>
