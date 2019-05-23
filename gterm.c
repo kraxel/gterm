@@ -22,6 +22,7 @@
 #define GTERM_CFG_KEY_FONT_SIZE         "faceSize"
 #define GTERM_CFG_KEY_GEOMETRY          "geometry"
 #define GTERM_CFG_KEY_TITLE             "title"
+#define GTERM_CFG_KEY_CURSOR_BLINK      "cursorBlink"
 
 typedef struct gterm_opt {
     char *opt;
@@ -29,12 +30,20 @@ typedef struct gterm_opt {
     bool is_bool;
 } gterm_opt;
 
+typedef enum gterm_bool {
+    GTERM_BOOL_UNSET  = -1,
+    GTERM_BOOL_FALSE  = 0,
+    GTERM_BOOL_TRUE   = 1,
+} gterm_bool;
+
 static const gterm_opt gterm_opts[] = {
     { .opt = "fa",            .key = GTERM_CFG_KEY_FONT_FACE },
     { .opt = "fs",            .key = GTERM_CFG_KEY_FONT_SIZE },
     { .opt = "geometry",      .key = GTERM_CFG_KEY_GEOMETRY  },
     { .opt = "T",             .key = GTERM_CFG_KEY_TITLE     },
     { .opt = "title",         .key = GTERM_CFG_KEY_TITLE     },
+
+    { .opt = "bc",            .key = GTERM_CFG_KEY_CURSOR_BLINK, .is_bool = true  },
 };
 
 static const gterm_opt *gterm_opt_find(char *arg)
@@ -75,6 +84,25 @@ static char *gterm_cfg_get(GKeyFile *cfg, char *key)
         return value;
 
     return NULL;
+}
+
+static gterm_bool gterm_cfg_get_bool(GKeyFile *cfg, char *key)
+{
+    char *value;
+
+    value = gterm_cfg_get(cfg, key);
+    if (!value)
+        return GTERM_BOOL_UNSET;
+
+    if (strcasecmp(value, "true") == 0 ||
+        strcasecmp(value, "on") == 0)
+        return GTERM_BOOL_TRUE;
+
+    if (strcasecmp(value, "false") == 0 ||
+        strcasecmp(value, "off") == 0)
+        return GTERM_BOOL_FALSE;
+
+    return GTERM_BOOL_UNSET;
 }
 
 /* ------------------------------------------------------------------------ */
@@ -158,6 +186,7 @@ static void gterm_vte_configure(gterm *gt)
     char *fontname;
     char *fontsize;
     char *str;
+    gterm_bool b;
     unsigned int cols, rows;
 
     fontname = gterm_cfg_get(gt->cfg, GTERM_CFG_KEY_FONT_FACE);
@@ -181,6 +210,15 @@ static void gterm_vte_configure(gterm *gt)
     str = gterm_cfg_get(gt->cfg, GTERM_CFG_KEY_GEOMETRY);
     if (str && sscanf(str, "%dx%d", &cols, &rows) == 2) {
         vte_terminal_set_size(VTE_TERMINAL(gt->terminal), cols, rows);
+    }
+
+    b = gterm_cfg_get_bool(gt->cfg, GTERM_CFG_KEY_CURSOR_BLINK);
+    if (b == GTERM_BOOL_TRUE) {
+        vte_terminal_set_cursor_blink_mode(VTE_TERMINAL(gt->terminal),
+                                           VTE_CURSOR_BLINK_ON);
+    } else if (b == GTERM_BOOL_FALSE) {
+        vte_terminal_set_cursor_blink_mode(VTE_TERMINAL(gt->terminal),
+                                           VTE_CURSOR_BLINK_OFF);
     }
 }
 
