@@ -12,6 +12,4 @@ executable('gterm',
            sources      : [ 'gterm.c' ],
            dependencies : [ gtk_dep, vte_dep ],
            install      : true)
-
-#install_man('gterm.1')
-
+install_man('gterm.1')
