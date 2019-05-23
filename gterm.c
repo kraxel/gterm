@@ -20,6 +20,12 @@
 
 #define GTERM_CFG_KEY_FONT_FACE         "faceName"
 #define GTERM_CFG_KEY_FONT_SIZE         "faceSize"
+#define GTERM_CFG_KEY_FONT_SIZE_1       "faceSize1"
+#define GTERM_CFG_KEY_FONT_SIZE_2       "faceSize2"
+#define GTERM_CFG_KEY_FONT_SIZE_3       "faceSize3"
+#define GTERM_CFG_KEY_FONT_SIZE_4       "faceSize4"
+#define GTERM_CFG_KEY_FONT_SIZE_5       "faceSize5"
+#define GTERM_CFG_KEY_FONT_SIZE_6       "faceSize6"
 #define GTERM_CFG_KEY_GEOMETRY          "geometry"
 #define GTERM_CFG_KEY_TITLE             "title"
 #define GTERM_CFG_KEY_CURSOR_BLINK      "cursorBlink"
@@ -84,7 +90,7 @@ static void gterm_cfg_set(GKeyFile *cfg, char *key, char *value)
     g_key_file_set_string(cfg, GTERM_CFG_GROUP_CMDLINE, key, value);
 }
 
-static char *gterm_cfg_get(GKeyFile *cfg, char *key)
+static char *gterm_cfg_get(GKeyFile *cfg, const char *key)
 {
     char *profile;
     char *value;
@@ -109,7 +115,7 @@ static char *gterm_cfg_get(GKeyFile *cfg, char *key)
     return NULL;
 }
 
-static gterm_bool gterm_cfg_get_bool(GKeyFile *cfg, char *key)
+static gterm_bool gterm_cfg_get_bool(GKeyFile *cfg, const char *key)
 {
     char *value;
 
@@ -137,6 +143,7 @@ typedef struct gterm {
 
     GtkWidget *fullscreen;
     GtkWidget *bell;
+    GSList *fontgrp;
 
     GKeyFile *cfg;
     GPid pid;
@@ -324,9 +331,38 @@ static void gterm_menu_bell(GtkCheckMenuItem *item,
     vte_terminal_set_audible_bell(VTE_TERMINAL(gt->terminal), state);
 }
 
+static void gterm_menu_font(GtkCheckMenuItem *item,
+                            gpointer user_data)
+{
+    gterm *gt = user_data;
+    PangoFontDescription *font;
+    gboolean state;
+    const char *name;
+
+    state = gtk_check_menu_item_get_active(item);
+    if (state) {
+        name = gtk_menu_item_get_label(GTK_MENU_ITEM(item));
+        font = pango_font_description_from_string(name);
+        vte_terminal_set_font(VTE_TERMINAL(gt->terminal), font);
+    }
+}
+
 static void gterm_fill_menu(gterm *gt)
 {
-    // GtkWidget *item;
+    static const char *sizes[] = {
+        GTERM_CFG_KEY_FONT_SIZE,
+        GTERM_CFG_KEY_FONT_SIZE_1,
+        GTERM_CFG_KEY_FONT_SIZE_2,
+        GTERM_CFG_KEY_FONT_SIZE_3,
+        GTERM_CFG_KEY_FONT_SIZE_4,
+        GTERM_CFG_KEY_FONT_SIZE_5,
+        GTERM_CFG_KEY_FONT_SIZE_6,
+    };
+    GtkWidget *item;
+    char *fontdesc;
+    char *fontname;
+    char *fontsize;
+    int i;
 
     gt->fullscreen = gtk_check_menu_item_new_with_label("Fullscreen");
     g_signal_connect(G_OBJECT(gt->fullscreen), "toggled",
@@ -337,6 +373,25 @@ static void gterm_fill_menu(gterm *gt)
     g_signal_connect(G_OBJECT(gt->bell), "toggled",
                      G_CALLBACK(gterm_menu_bell), gt);
     gtk_container_add(GTK_CONTAINER(gt->popup), gt->bell);
+
+    item = gtk_separator_menu_item_new();
+    gtk_container_add(GTK_CONTAINER(gt->popup), item);
+
+    fontname = gterm_cfg_get(gt->cfg, GTERM_CFG_KEY_FONT_FACE);
+    if (!fontname)
+        fontname = "monospace";
+    for (i = 0; i < ARRAY_SIZE(sizes); i++) {
+        fontsize = gterm_cfg_get(gt->cfg, sizes[i]);
+        if (!fontsize)
+            continue;
+        fontdesc = g_strdup_printf("%s %s", fontname, fontsize);
+        item = gtk_radio_menu_item_new_with_label(gt->fontgrp, fontdesc);
+        gt->fontgrp = gtk_radio_menu_item_get_group(GTK_RADIO_MENU_ITEM(item));
+        g_signal_connect(G_OBJECT(item), "toggled",
+                         G_CALLBACK(gterm_menu_font), gt);
+        gtk_container_add(GTK_CONTAINER(gt->popup), item);
+        g_free(fontdesc);
+    }
 
     gtk_widget_show_all(gt->popup);
 }
