@@ -131,6 +131,10 @@ static gterm_bool gterm_cfg_get_bool(GKeyFile *cfg, char *key)
 typedef struct gterm {
     GtkWidget *window;
     GtkWidget *terminal;
+    GtkWidget *popup;
+
+    GtkWidget *fullscreen;
+
     GKeyFile *cfg;
     GPid pid;
     gint exit_code;
@@ -201,6 +205,27 @@ static void gterm_vte_window_title_changed(VteTerminal *vteterminal,
     gtk_window_set_title(GTK_WINDOW(gt->window), str);
 }
 
+static gboolean gterm_vte_button_press_event(GtkWidget *widget,
+                                             GdkEvent  *event,
+                                             gpointer   user_data)
+{
+    GdkEventButton *btn = (GdkEventButton *)event;
+    gterm *gt = user_data;
+
+    if (btn->type != GDK_BUTTON_PRESS)
+        return FALSE;
+    if (!(btn->state & GDK_CONTROL_MASK))
+        return FALSE;
+
+    if (!(btn->button == 1 ||
+          btn->button == 2 ||
+          btn->button == 3))
+        return FALSE;
+
+    gtk_menu_popup_at_pointer(GTK_MENU(gt->popup), event);
+    return TRUE;
+}
+
 static void gterm_vte_configure(gterm *gt)
 {
     char *fontdesc;
@@ -260,6 +285,34 @@ static void gterm_vte_configure(gterm *gt)
     }
 }
 
+/* ------------------------------------------------------------------------ */
+
+static void gterm_menu_fullscreen(GtkCheckMenuItem *item,
+                                  gpointer user_data)
+{
+    gterm *gt = user_data;
+
+    if (gtk_check_menu_item_get_active(item)) {
+        gtk_window_fullscreen(GTK_WINDOW(gt->window));
+    } else {
+        gtk_window_unfullscreen(GTK_WINDOW(gt->window));
+    }
+}
+
+static void gterm_fill_menu(gterm *gt)
+{
+    // GtkWidget *item;
+
+    gt->fullscreen = gtk_check_menu_item_new_with_label("Fullscreen");
+    g_signal_connect(G_OBJECT(gt->fullscreen), "toggled",
+                     G_CALLBACK(gterm_menu_fullscreen), gt);
+    gtk_container_add(GTK_CONTAINER(gt->popup), gt->fullscreen);
+
+    gtk_widget_show_all(gt->popup);
+}
+
+/* ------------------------------------------------------------------------ */
+
 static void gterm_window_destroy(GtkWidget *widget, gpointer data)
 {
     gtk_main_quit();
@@ -290,17 +343,23 @@ static gterm *gterm_new(GKeyFile *cfg)
     gt->window = gtk_window_new(GTK_WINDOW_TOPLEVEL);
     g_signal_connect(G_OBJECT(gt->window), "destroy",
                      G_CALLBACK(gterm_window_destroy), gt);
-    gterm_window_configure(gt);
 
     gt->terminal = vte_terminal_new();
     g_signal_connect(G_OBJECT(gt->terminal), "child-exited",
                      G_CALLBACK(gterm_vte_child_exited), gt);
     g_signal_connect(G_OBJECT(gt->terminal), "window-title-changed",
                      G_CALLBACK(gterm_vte_window_title_changed), gt);
-    gterm_vte_configure(gt);
-
+    g_signal_connect(G_OBJECT(gt->terminal), "button-press-event",
+                     G_CALLBACK(gterm_vte_button_press_event), gt);
     gtk_container_add(GTK_CONTAINER(gt->window), gt->terminal);
+
+    gt->popup = gtk_menu_new();
+    gterm_fill_menu(gt);
+
+    gterm_window_configure(gt);
+    gterm_vte_configure(gt);
     gtk_widget_show_all(gt->window);
+
     return gt;
 }
 
