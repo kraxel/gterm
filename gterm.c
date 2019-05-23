@@ -27,6 +27,7 @@
 #define GTERM_CFG_KEY_FOREGROUND        "foreground"
 #define GTERM_CFG_KEY_BACKGROUND        "background"
 #define GTERM_CFG_KEY_PROFILE           "profile"
+#define GTERM_CFG_KEY_FULLSCREEN        "fullscreen"
 
 typedef struct gterm_opt {
     char *opt;
@@ -53,6 +54,7 @@ static const gterm_opt gterm_opts[] = {
     { .opt = "class",         .key = GTERM_CFG_KEY_PROFILE       },
 
     { .opt = "bc",            .key = GTERM_CFG_KEY_CURSOR_BLINK, .is_bool = true  },
+    { .opt = "fullscreen",    .key = GTERM_CFG_KEY_FULLSCREEN,   .is_bool = true  },
 };
 
 static const gterm_opt *gterm_opt_find(char *arg)
@@ -265,11 +267,17 @@ static void gterm_window_destroy(GtkWidget *widget, gpointer data)
 
 static void gterm_window_configure(gterm *gt)
 {
+    gterm_bool b;
     char *str;
 
     str = gterm_cfg_get(gt->cfg, GTERM_CFG_KEY_TITLE);
     if (str) {
         gtk_window_set_title(GTK_WINDOW(gt->window), str);
+    }
+
+    b = gterm_cfg_get_bool(gt->cfg, GTERM_CFG_KEY_FULLSCREEN);
+    if (b == GTERM_BOOL_TRUE) {
+        gtk_window_fullscreen(GTK_WINDOW(gt->window));
     }
 }
 
