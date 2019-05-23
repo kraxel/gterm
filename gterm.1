@@ -24,22 +24,45 @@ one are passed to the command started and will not be parsed, so this
 should be last on your command line.  If not specified a shell is
 started.
 .TP
-.B -fa <face>
-The font face to use (config key: faceName).
+.BI -fa " face"
+The font face to use.
+.br
+Config file key: faceName.
 .TP
-.B -fs <size>
-The font size to use (config key: faceSize).
+.BI -fs " size"
+The font size to use.
+.br
+Config file key: faceSize.
 \#
 \#
 .SH "CONFIG FILE"
 .BR gterm
 reads the configuration from the 
 .BR ~/.config/gterm.conf
-config file.  A "[default]" section holds the config options.
+config file.
+A "[default]" section holds the config options.
+Example:
+.P
+.in +4n
+[default]
+.br
+faceName=Terminus
+.br
+faceSize=12
+.in
+.P
+This has the same effect this ~/.Xdefaults snippet has for xterm:
+.P
+.in +4n
+XTerm.vt100*faceName: Terminus
+.br
+XTerm.vt100*faceSize: 12
+.in
+.P
 \#
 \#
 .SH "SEE ALSO"
-.BR xterm(1),
+.BR xterm(1)
 \#
 \#
 .SH AUTHOR
