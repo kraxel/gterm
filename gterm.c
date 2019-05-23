@@ -28,6 +28,7 @@
 #define GTERM_CFG_KEY_BACKGROUND        "background"
 #define GTERM_CFG_KEY_PROFILE           "profile"
 #define GTERM_CFG_KEY_FULLSCREEN        "fullscreen"
+#define GTERM_CFG_KEY_VISUAL_BELL       "visualBell"
 
 typedef struct gterm_opt {
     char *opt;
@@ -55,6 +56,7 @@ static const gterm_opt gterm_opts[] = {
 
     { .opt = "bc",            .key = GTERM_CFG_KEY_CURSOR_BLINK, .is_bool = true  },
     { .opt = "fullscreen",    .key = GTERM_CFG_KEY_FULLSCREEN,   .is_bool = true  },
+    { .opt = "vb",            .key = GTERM_CFG_KEY_VISUAL_BELL,  .is_bool = true  },
 };
 
 static const gterm_opt *gterm_opt_find(char *arg)
@@ -266,6 +268,15 @@ static void gterm_vte_configure(gterm *gt)
     } else if (b == GTERM_BOOL_FALSE) {
         vte_terminal_set_cursor_blink_mode(VTE_TERMINAL(gt->terminal),
                                            VTE_CURSOR_BLINK_OFF);
+    }
+
+    b = gterm_cfg_get_bool(gt->cfg, GTERM_CFG_KEY_VISUAL_BELL);
+    if (b == GTERM_BOOL_TRUE) {
+        vte_terminal_set_audible_bell(VTE_TERMINAL(gt->terminal),
+                                      false);
+    } else if (b == GTERM_BOOL_FALSE) {
+        vte_terminal_set_audible_bell(VTE_TERMINAL(gt->terminal),
+                                      true);
     }
 
     str = gterm_cfg_get(gt->cfg, GTERM_CFG_KEY_CURSOR_COLOR);
