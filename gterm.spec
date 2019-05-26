@@ -11,8 +11,8 @@ BuildRequires: pkgconfig(gtk+-3.0)
 BuildRequires: pkgconfig(vte-2.91)
 
 %description
-Terminal application, based on gtk3 and vte.  The plan is to have a
-modern terminal (which runs on wayland for example) for xterm fans.
+Terminal application, based on gtk3 and vte.  The plan
+is to have a modern terminal for xterm fans.
 
 %prep
 %setup -q
