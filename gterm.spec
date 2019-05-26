@@ -27,7 +27,7 @@ export DESTDIR=%{buildroot}
 ninja-build -C build-rpm install
 
 %files
-%doc README COPYING
+%doc README.md COPYING
 %{_bindir}/gterm
 %{_mandir}/man1/gterm.1*
 %{_prefix}/share/applications/gterm.desktop
