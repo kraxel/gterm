@@ -14,5 +14,5 @@ addons:
       - libvte-2.91-dev
 
 script:
-  - meson build-travis
+  - meson . build-travis
   - ninja -C build-travis
