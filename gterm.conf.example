@@ -1,0 +1,15 @@
+[default]
+faceName=Terminus
+faceSize=12
+faceSize1=8
+faceSize2=16
+faceSize3=24
+geometry=100x50
+cursorBlink=false
+cursorColor=yellow
+
+# "gterm -name root_xterm" will use this
+[root_xterm]
+foreground=white
+background=#300000
+
