@@ -1,5 +1,6 @@
-language: c
 os: linux
+dist: xenial
+language: c
 compiler: gcc
 
 addons:
