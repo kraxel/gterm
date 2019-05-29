@@ -167,6 +167,7 @@ static void gterm_spawn_cb(VteTerminal *terminal, GPid pid,
 
 static void gterm_spawn(gterm *gt, char *argv[])
 {
+#if VTE_CHECK_VERSION(0,48,0)
     vte_terminal_spawn_async(VTE_TERMINAL(gt->terminal),
                              VTE_PTY_DEFAULT,
                              NULL,
@@ -180,6 +181,23 @@ static void gterm_spawn(gterm *gt, char *argv[])
                              NULL,
                              gterm_spawn_cb,
                              gt);
+#else
+    GError *error = NULL;
+    GPid pid = -1;
+
+    vte_terminal_spawn_sync(VTE_TERMINAL(gt->terminal),
+                            VTE_PTY_DEFAULT,
+                            NULL,
+                            argv,
+                            NULL,
+                            G_SPAWN_SEARCH_PATH,
+                            NULL,
+                            NULL,
+                            &pid,
+                            NULL,
+                            &error);
+    gterm_spawn_cb(gt->terminal, pid, error, gt);
+#endif
 }
 
 static void gterm_spawn_shell(gterm *gt)
