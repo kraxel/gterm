@@ -196,7 +196,7 @@ static void gterm_spawn(gterm *gt, char *argv[])
                             &pid,
                             NULL,
                             &error);
-    gterm_spawn_cb(gt->terminal, pid, error, gt);
+    gterm_spawn_cb(VTE_TERMINAL(gt->terminal), pid, error, gt);
 #endif
 }
 
@@ -251,7 +251,14 @@ static gboolean gterm_vte_button_press_event(GtkWidget *widget,
           btn->button == 3))
         return FALSE;
 
+#if GTK_CHECK_VERSION(3,22,0)
     gtk_menu_popup_at_pointer(GTK_MENU(gt->popup), event);
+#else
+    gtk_menu_popup(GTK_MENU(gt->popup),
+                   NULL, NULL, NULL, NULL,
+                   btn->button,
+                   gtk_get_current_event_time());
+#endif
     return TRUE;
 }
 
