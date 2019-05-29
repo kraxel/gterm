@@ -348,6 +348,14 @@ static void gterm_menu_font(GtkCheckMenuItem *item,
     }
 }
 
+static void gterm_menu_reset(GtkMenuItem *item,
+                             gpointer user_data)
+{
+    gterm *gt = user_data;
+
+    vte_terminal_reset(VTE_TERMINAL(gt->terminal), true, true);
+}
+
 static void gterm_fill_menu(gterm *gt)
 {
     static const char *sizes[] = {
@@ -393,6 +401,14 @@ static void gterm_fill_menu(gterm *gt)
         gtk_container_add(GTK_CONTAINER(gt->popup), item);
         g_free(fontdesc);
     }
+
+    item = gtk_separator_menu_item_new();
+    gtk_container_add(GTK_CONTAINER(gt->popup), item);
+
+    item = gtk_menu_item_new_with_label("Terminal reset");
+    g_signal_connect(G_OBJECT(item), "activate",
+                     G_CALLBACK(gterm_menu_reset), gt);
+    gtk_container_add(GTK_CONTAINER(gt->popup), item);
 
     gtk_widget_show_all(gt->popup);
 }
