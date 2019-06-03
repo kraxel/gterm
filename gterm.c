@@ -333,6 +333,27 @@ static void gterm_vte_configure(gterm *gt)
     }
 }
 
+static void gterm_vte_geometry_hints(gterm *gt)
+{
+    gint cw = vte_terminal_get_char_width(VTE_TERMINAL(gt->terminal));
+    gint ch = vte_terminal_get_char_height(VTE_TERMINAL(gt->terminal));
+    GdkGeometry hints = {
+        .min_width   = cw,
+        .min_height  = ch,
+        .base_width  = cw,
+        .base_height = ch,
+        .width_inc   = cw,
+        .height_inc  = ch,
+    };
+
+    gtk_window_set_geometry_hints(GTK_WINDOW(gt->window),
+                                  GTK_WIDGET(gt->terminal),
+                                  &hints,
+                                  GDK_HINT_RESIZE_INC |
+                                  GDK_HINT_MIN_SIZE |
+                                  GDK_HINT_BASE_SIZE);
+}
+
 /* ------------------------------------------------------------------------ */
 
 static void gterm_menu_fullscreen(GtkCheckMenuItem *item,
@@ -370,6 +391,7 @@ static void gterm_menu_font(GtkCheckMenuItem *item,
         name = gtk_menu_item_get_label(GTK_MENU_ITEM(item));
         font = pango_font_description_from_string(name);
         vte_terminal_set_font(VTE_TERMINAL(gt->terminal), font);
+        gterm_vte_geometry_hints(gt);
     }
 }
 
@@ -485,6 +507,7 @@ static gterm *gterm_new(GKeyFile *cfg)
 
     gterm_window_configure(gt);
     gterm_vte_configure(gt);
+    gterm_vte_geometry_hints(gt);
     gtk_widget_show_all(gt->window);
 
     return gt;
