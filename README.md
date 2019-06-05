@@ -1,13 +1,12 @@
 
-### gterm
+# gterm
 
-# status
+### status
 
-Travis: [![Travis Status](https://travis-ci.com/kraxel/gterm.svg?branch=master)](https://travis-ci.com/kraxel/gterm)
+[![Travis Status](https://travis-ci.com/kraxel/gterm.svg?branch=master)](https://travis-ci.com/kraxel/gterm)
+[![Copr Status](https://copr.fedorainfracloud.org/coprs/kraxel/mine.git/package/gterm/status_image/last_build.png)](https://copr.fedorainfracloud.org/coprs/kraxel/mine.git/package/gterm/)
 
-Copr: [![Cor Status](https://copr.fedorainfracloud.org/coprs/kraxel/mine.git/package/gterm/status_image/last_build.png)](https://copr.fedorainfracloud.org/coprs/kraxel/mine.git/)
-
-# what is gterm
+### what is gterm
 
 Terminal application, based on gtk3 and vte.  The plan is to have a
 modern terminal (which can -- for example -- run on wayland and render
