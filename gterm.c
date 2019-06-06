@@ -36,6 +36,7 @@
 #define GTERM_CFG_KEY_PROFILE           "profile"
 #define GTERM_CFG_KEY_FULLSCREEN        "fullscreen"
 #define GTERM_CFG_KEY_VISUAL_BELL       "visualBell"
+#define GTERM_CFG_KEY_SCROLLBACK_LINES  "saveLines"
 
 typedef struct gterm_opt {
     char *opt;
@@ -60,6 +61,7 @@ static const gterm_opt gterm_opts[] = {
     { .opt = "bg",            .key = GTERM_CFG_KEY_BACKGROUND    },
     { .opt = "name",          .key = GTERM_CFG_KEY_PROFILE       },
     { .opt = "class",         .key = GTERM_CFG_KEY_PROFILE       },
+    { .opt = "sl",            .key = GTERM_CFG_KEY_SCROLLBACK_LINES },
 
     { .opt = "bc",            .key = GTERM_CFG_KEY_CURSOR_BLINK, .is_bool = true  },
     { .opt = "fullscreen",    .key = GTERM_CFG_KEY_FULLSCREEN,   .is_bool = true  },
@@ -330,6 +332,11 @@ static void gterm_vte_configure(gterm *gt)
     if (str) {
         gdk_rgba_parse(&color, str);
         vte_terminal_set_color_background(VTE_TERMINAL(gt->terminal), &color);
+    }
+    str = gterm_cfg_get(gt->cfg, GTERM_CFG_KEY_SCROLLBACK_LINES);
+    if (str) {
+        vte_terminal_set_scrollback_lines(VTE_TERMINAL(gt->terminal),
+                                          atoi(str));
     }
 }
 
