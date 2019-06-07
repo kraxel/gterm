@@ -392,14 +392,23 @@ static void gterm_menu_font(GtkCheckMenuItem *item,
     PangoFontDescription *font;
     gboolean state;
     const char *name;
+    GtkRequisition min, nat;
 
     state = gtk_check_menu_item_get_active(item);
-    if (state) {
-        name = gtk_menu_item_get_label(GTK_MENU_ITEM(item));
-        font = pango_font_description_from_string(name);
-        vte_terminal_set_font(VTE_TERMINAL(gt->terminal), font);
-        gterm_vte_geometry_hints(gt);
-    }
+    if (!state)
+        return;
+
+    name = gtk_menu_item_get_label(GTK_MENU_ITEM(item));
+    font = pango_font_description_from_string(name);
+    vte_terminal_set_font(VTE_TERMINAL(gt->terminal), font);
+    gterm_vte_geometry_hints(gt);
+
+    /*
+     * Force window resize.  Not sure why this is needed, shouldn't
+     * the window automatically respond to terminal size requests?
+     */
+    gtk_widget_get_preferred_size(GTK_WIDGET(gt->terminal), &min, &nat);
+    gtk_window_resize(GTK_WINDOW(gt->window), nat.width, nat.height);
 }
 
 static void gterm_menu_reset(GtkMenuItem *item,
