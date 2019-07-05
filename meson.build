@@ -9,7 +9,7 @@ gtk_dep = dependency('gtk+-3.0', method: 'pkg-config')
 vte_dep = dependency('vte-2.91', method: 'pkg-config')
 
 executable('gterm',
-           sources      : [ 'gterm.c' ],
+           sources      : [ 'gterm.c', 'gcfg.c' ],
            dependencies : [ gtk_dep, vte_dep ],
            install      : true)
 install_man('gterm.1')

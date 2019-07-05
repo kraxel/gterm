@@ -11,13 +11,11 @@
 #include <gtk/gtk.h>
 #include <vte/vte.h>
 
-#define ARRAY_SIZE(_x) (sizeof(_x)/sizeof(_x[0]))
+#include "gcfg.h"
 
 /* ------------------------------------------------------------------------ */
 
 #define GTERM_CFG_FILENAME              ".config/gterm.conf"
-#define GTERM_CFG_GROUP_DEFAULT         "default"
-#define GTERM_CFG_GROUP_CMDLINE         "_cmdline_"
 
 #define GTERM_CFG_KEY_FONT_FACE         "faceName"
 #define GTERM_CFG_KEY_FONT_SIZE         "faceSize"
@@ -33,24 +31,11 @@
 #define GTERM_CFG_KEY_CURSOR_COLOR      "cursorColor"
 #define GTERM_CFG_KEY_FOREGROUND        "foreground"
 #define GTERM_CFG_KEY_BACKGROUND        "background"
-#define GTERM_CFG_KEY_PROFILE           "profile"
 #define GTERM_CFG_KEY_FULLSCREEN        "fullscreen"
 #define GTERM_CFG_KEY_VISUAL_BELL       "visualBell"
 #define GTERM_CFG_KEY_SCROLLBACK_LINES  "saveLines"
 
-typedef struct gterm_opt {
-    char *opt;
-    char *key;
-    bool is_bool;
-} gterm_opt;
-
-typedef enum gterm_bool {
-    GTERM_BOOL_UNSET  = -1,
-    GTERM_BOOL_FALSE  = 0,
-    GTERM_BOOL_TRUE   = 1,
-} gterm_bool;
-
-static const gterm_opt gterm_opts[] = {
+static const gcfg_opt gterm_opts[] = {
     { .opt = "fa",            .key = GTERM_CFG_KEY_FONT_FACE     },
     { .opt = "fs",            .key = GTERM_CFG_KEY_FONT_SIZE     },
     { .opt = "geometry",      .key = GTERM_CFG_KEY_GEOMETRY      },
@@ -59,83 +44,14 @@ static const gterm_opt gterm_opts[] = {
     { .opt = "cr",            .key = GTERM_CFG_KEY_CURSOR_COLOR  },
     { .opt = "fg",            .key = GTERM_CFG_KEY_FOREGROUND    },
     { .opt = "bg",            .key = GTERM_CFG_KEY_BACKGROUND    },
-    { .opt = "name",          .key = GTERM_CFG_KEY_PROFILE       },
-    { .opt = "class",         .key = GTERM_CFG_KEY_PROFILE       },
+    { .opt = "name",          .key = GCFG_KEY_PROFILE            },
+    { .opt = "class",         .key = GCFG_KEY_PROFILE            },
     { .opt = "sl",            .key = GTERM_CFG_KEY_SCROLLBACK_LINES },
 
     { .opt = "bc",            .key = GTERM_CFG_KEY_CURSOR_BLINK, .is_bool = true  },
     { .opt = "fullscreen",    .key = GTERM_CFG_KEY_FULLSCREEN,   .is_bool = true  },
     { .opt = "vb",            .key = GTERM_CFG_KEY_VISUAL_BELL,  .is_bool = true  },
 };
-
-static const gterm_opt *gterm_opt_find(char *arg)
-{
-    const gterm_opt *opt = NULL;
-    int i;
-
-    if (arg[0] != '-' && arg[0] != '+')
-        return NULL;
-    for (i = 0; i < ARRAY_SIZE(gterm_opts); i++) {
-        if (strcmp(gterm_opts[i].opt, arg + 1) == 0) {
-            opt = gterm_opts + i;
-            break;
-        }
-    }
-    if (!opt)
-        return NULL;
-    if (arg[0] == '+' && !opt->is_bool)
-        return NULL;
-    return opt;
-}
-
-static void gterm_cfg_set(GKeyFile *cfg, char *key, char *value)
-{
-    g_key_file_set_string(cfg, GTERM_CFG_GROUP_CMDLINE, key, value);
-}
-
-static char *gterm_cfg_get(GKeyFile *cfg, const char *key)
-{
-    char *profile;
-    char *value;
-
-    profile = g_key_file_get_string(cfg, GTERM_CFG_GROUP_CMDLINE,
-                                    GTERM_CFG_KEY_PROFILE, NULL);
-
-    value = g_key_file_get_string(cfg, GTERM_CFG_GROUP_CMDLINE, key, NULL);
-    if (value)
-        return value;
-
-    if (profile) {
-        value = g_key_file_get_string(cfg, profile, key, NULL);
-        if (value)
-            return value;
-    }
-
-    value = g_key_file_get_string(cfg, GTERM_CFG_GROUP_DEFAULT, key, NULL);
-    if (value)
-        return value;
-
-    return NULL;
-}
-
-static gterm_bool gterm_cfg_get_bool(GKeyFile *cfg, const char *key)
-{
-    char *value;
-
-    value = gterm_cfg_get(cfg, key);
-    if (!value)
-        return GTERM_BOOL_UNSET;
-
-    if (strcasecmp(value, "true") == 0 ||
-        strcasecmp(value, "on") == 0)
-        return GTERM_BOOL_TRUE;
-
-    if (strcasecmp(value, "false") == 0 ||
-        strcasecmp(value, "off") == 0)
-        return GTERM_BOOL_FALSE;
-
-    return GTERM_BOOL_UNSET;
-}
 
 /* ------------------------------------------------------------------------ */
 
@@ -270,13 +186,13 @@ static void gterm_vte_configure(gterm *gt)
     char *fontname;
     char *fontsize;
     char *str;
-    gterm_bool b;
+    gcfg_bool b;
     gboolean state;
     GdkRGBA color;
     unsigned int cols, rows;
 
-    fontname = gterm_cfg_get(gt->cfg, GTERM_CFG_KEY_FONT_FACE);
-    fontsize = gterm_cfg_get(gt->cfg, GTERM_CFG_KEY_FONT_SIZE);
+    fontname = gcfg_get(gt->cfg, GTERM_CFG_KEY_FONT_FACE);
+    fontsize = gcfg_get(gt->cfg, GTERM_CFG_KEY_FONT_SIZE);
     if (fontname && fontsize) {
         fontdesc = g_strdup_printf("%s %s", fontname, fontsize);
     } else if (fontname) {
@@ -293,24 +209,24 @@ static void gterm_vte_configure(gterm *gt)
         g_free(fontdesc);
     }
 
-    str = gterm_cfg_get(gt->cfg, GTERM_CFG_KEY_GEOMETRY);
+    str = gcfg_get(gt->cfg, GTERM_CFG_KEY_GEOMETRY);
     if (str && sscanf(str, "%dx%d", &cols, &rows) == 2) {
         vte_terminal_set_size(VTE_TERMINAL(gt->terminal), cols, rows);
     }
 
-    b = gterm_cfg_get_bool(gt->cfg, GTERM_CFG_KEY_CURSOR_BLINK);
-    if (b == GTERM_BOOL_TRUE) {
+    b = gcfg_get_bool(gt->cfg, GTERM_CFG_KEY_CURSOR_BLINK);
+    if (b == GCFG_BOOL_TRUE) {
         vte_terminal_set_cursor_blink_mode(VTE_TERMINAL(gt->terminal),
                                            VTE_CURSOR_BLINK_ON);
-    } else if (b == GTERM_BOOL_FALSE) {
+    } else if (b == GCFG_BOOL_FALSE) {
         vte_terminal_set_cursor_blink_mode(VTE_TERMINAL(gt->terminal),
                                            VTE_CURSOR_BLINK_OFF);
     }
 
-    b = gterm_cfg_get_bool(gt->cfg, GTERM_CFG_KEY_VISUAL_BELL);
-    if (b == GTERM_BOOL_TRUE) {
+    b = gcfg_get_bool(gt->cfg, GTERM_CFG_KEY_VISUAL_BELL);
+    if (b == GCFG_BOOL_TRUE) {
         state = false;
-    } else if (b == GTERM_BOOL_FALSE) {
+    } else if (b == GCFG_BOOL_FALSE) {
         state = true;
     } else {
         state = vte_terminal_get_audible_bell(VTE_TERMINAL(gt->terminal));
@@ -318,22 +234,22 @@ static void gterm_vte_configure(gterm *gt)
     gtk_check_menu_item_set_active(GTK_CHECK_MENU_ITEM(gt->bell), state);
     vte_terminal_set_audible_bell(VTE_TERMINAL(gt->terminal), state);
 
-    str = gterm_cfg_get(gt->cfg, GTERM_CFG_KEY_CURSOR_COLOR);
+    str = gcfg_get(gt->cfg, GTERM_CFG_KEY_CURSOR_COLOR);
     if (str) {
         gdk_rgba_parse(&color, str);
         vte_terminal_set_color_cursor(VTE_TERMINAL(gt->terminal), &color);
     }
-    str = gterm_cfg_get(gt->cfg, GTERM_CFG_KEY_FOREGROUND);
+    str = gcfg_get(gt->cfg, GTERM_CFG_KEY_FOREGROUND);
     if (str) {
         gdk_rgba_parse(&color, str);
         vte_terminal_set_color_foreground(VTE_TERMINAL(gt->terminal), &color);
     }
-    str = gterm_cfg_get(gt->cfg, GTERM_CFG_KEY_BACKGROUND);
+    str = gcfg_get(gt->cfg, GTERM_CFG_KEY_BACKGROUND);
     if (str) {
         gdk_rgba_parse(&color, str);
         vte_terminal_set_color_background(VTE_TERMINAL(gt->terminal), &color);
     }
-    str = gterm_cfg_get(gt->cfg, GTERM_CFG_KEY_SCROLLBACK_LINES);
+    str = gcfg_get(gt->cfg, GTERM_CFG_KEY_SCROLLBACK_LINES);
     if (str) {
         vte_terminal_set_scrollback_lines(VTE_TERMINAL(gt->terminal),
                                           atoi(str));
@@ -449,11 +365,11 @@ static void gterm_fill_menu(gterm *gt)
     item = gtk_separator_menu_item_new();
     gtk_container_add(GTK_CONTAINER(gt->popup), item);
 
-    fontname = gterm_cfg_get(gt->cfg, GTERM_CFG_KEY_FONT_FACE);
+    fontname = gcfg_get(gt->cfg, GTERM_CFG_KEY_FONT_FACE);
     if (!fontname)
         fontname = "monospace";
     for (i = 0; i < ARRAY_SIZE(sizes); i++) {
-        fontsize = gterm_cfg_get(gt->cfg, sizes[i]);
+        fontsize = gcfg_get(gt->cfg, sizes[i]);
         if (!fontsize)
             continue;
         fontdesc = g_strdup_printf("%s %s", fontname, fontsize);
@@ -485,16 +401,16 @@ static void gterm_window_destroy(GtkWidget *widget, gpointer data)
 
 static void gterm_window_configure(gterm *gt)
 {
-    gterm_bool b;
+    gcfg_bool b;
     char *str;
 
-    str = gterm_cfg_get(gt->cfg, GTERM_CFG_KEY_TITLE);
+    str = gcfg_get(gt->cfg, GTERM_CFG_KEY_TITLE);
     if (str) {
         gtk_window_set_title(GTK_WINDOW(gt->window), str);
     }
 
-    b = gterm_cfg_get_bool(gt->cfg, GTERM_CFG_KEY_FULLSCREEN);
-    if (b == GTERM_BOOL_TRUE) {
+    b = gcfg_get_bool(gt->cfg, GTERM_CFG_KEY_FULLSCREEN);
+    if (b == GCFG_BOOL_TRUE) {
         gtk_check_menu_item_set_active(GTK_CHECK_MENU_ITEM(gt->fullscreen), true);
     }
 }
@@ -534,7 +450,7 @@ int main(int argc, char *argv[])
     char *filename;
     GKeyFile *cfg;
     gterm *gt;
-    const gterm_opt *opt;
+    const gcfg_opt *opt;
     int i, eopt = 0;
 
     gtk_init(&argc, &argv);
@@ -549,23 +465,23 @@ int main(int argc, char *argv[])
             eopt = i + 1;
             break;
         }
-        opt = gterm_opt_find(argv[i]);
+        opt = gcfg_opt_find(gterm_opts, ARRAY_SIZE(gterm_opts), argv[i]);
         if (!opt) {
             fprintf(stderr, "unknown option: %s\n", argv[i]);
             exit(1);
         }
         if (opt->is_bool) {
             if (argv[i][0] == '-')
-                gterm_cfg_set(cfg, opt->key, "true");
+                gcfg_set(cfg, opt->key, "true");
             else
-                gterm_cfg_set(cfg, opt->key, "false");
+                gcfg_set(cfg, opt->key, "false");
             i++;
         } else {
             if (i + 1 == argc) {
                 fprintf(stderr, "missing argument for: %s\n", argv[i]);
                 exit(1);
             }
-            gterm_cfg_set(cfg, opt->key, argv[i+1]);
+            gcfg_set(cfg, opt->key, argv[i+1]);
             i += 2;
         }
     }
