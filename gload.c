@@ -130,7 +130,7 @@ static gboolean gload_draw(GtkWidget *widget, cairo_t *cr, gpointer data)
     gload *gl = data;
     GtkStyleContext *context;
     GdkRGBA normal, dimmed;
-    guint width, height, i, idx, max;
+    guint width, height, i, idx, max, brightness;
     bool darkmode;
 
     context = gtk_widget_get_style_context(widget);
@@ -138,7 +138,12 @@ static gboolean gload_draw(GtkWidget *widget, cairo_t *cr, gpointer data)
     height = gtk_widget_get_allocated_height(widget);
 
     gtk_style_context_get_color(context, GTK_STATE_FLAG_NORMAL, &normal);
-    darkmode = gload_brightness(&normal) > 50;
+    brightness = gload_brightness(&normal);
+    darkmode = brightness > 50;
+#if 0
+    fprintf(stderr, "%s: foreground brightness %d/100 -> darkmode %s\n", __func__,
+            brightness, darkmode ? "yes" : "no");
+#endif
     if (darkmode)
         gload_darken(&normal, &dimmed, 30);
     else
