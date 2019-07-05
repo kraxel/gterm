@@ -19,3 +19,8 @@ few xterm features are pretty much obsolete these days and/or will simply
 not work with wayland.  The x11 server side font rendering comes to mind
 for example.  Also any charset quirks dating back to the early x11 days,
 before unicode and utf-8 did exist.
+
+## gload
+
+Bundled with gterm is the small gload utility, which is a xload style
+load average monitor.
