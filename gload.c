@@ -195,6 +195,7 @@ static gload *gload_new(void)
 
     uname(&uts);
     gl->label = gtk_label_new(uts.nodename);
+    gtk_label_set_xalign(GTK_LABEL(gl->label), 0);
     gtk_box_pack_start(GTK_BOX(vbox), gl->label, false, false, 0);
 
     gl->graph = gtk_drawing_area_new();
@@ -215,7 +216,7 @@ int main(int argc, char *argv[])
 
     gl = gload_new();
     gload_read(gl);
-    g_timeout_add_seconds(1, gload_timer, gl);
+    g_timeout_add_seconds(10, gload_timer, gl);
 
     gtk_main();
     return 0;
