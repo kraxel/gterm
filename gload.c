@@ -101,53 +101,21 @@ static gboolean gload_timer(gpointer user_data)
 
 /* ------------------------------------------------------------------------ */
 
-static int gload_brightness(GdkRGBA *color)
-{
-    /* scale: 0 -> 100 */
-    return (color->red * 30 +
-            color->green * 60 +
-            color->blue * 10);
-}
-
-static void gload_darken(GdkRGBA *src, GdkRGBA *dst, int percent)
-{
-    dst->red   = src->red   - src->red   * percent / 100;
-    dst->green = src->green - src->green * percent / 100;
-    dst->blue  = src->blue  - src->blue  * percent / 100;
-    dst->alpha = 1;
-}
-
-static void gload_lighten(GdkRGBA *src, GdkRGBA *dst, int percent)
-{
-    dst->red   = src->red   + (1-src->red)   * percent / 100;
-    dst->green = src->green + (1-src->green) * percent / 100;
-    dst->blue  = src->blue  + (1-src->blue)  * percent / 100;
-    dst->alpha = 1;
-}
-
 static gboolean gload_draw(GtkWidget *widget, cairo_t *cr, gpointer data)
 {
     gload *gl = data;
     GtkStyleContext *context;
     GdkRGBA normal, dimmed;
-    guint width, height, i, idx, max, brightness;
-    bool darkmode;
+    guint width, height, i, idx, max;
 
     context = gtk_widget_get_style_context(widget);
     width = gtk_widget_get_allocated_width(widget);
     height = gtk_widget_get_allocated_height(widget);
 
     gtk_style_context_get_color(context, GTK_STATE_FLAG_NORMAL, &normal);
-    brightness = gload_brightness(&normal);
-    darkmode = brightness > 50;
-#if 0
-    fprintf(stderr, "%s: foreground brightness %d/100 -> darkmode %s\n", __func__,
-            brightness, darkmode ? "yes" : "no");
-#endif
-    if (darkmode)
-        gload_darken(&normal, &dimmed, 30);
-    else
-        gload_lighten(&normal, &dimmed, 30);
+    dimmed = normal;
+    normal.alpha = 1.0;
+    dimmed.alpha = 0.6;
 
     gload_resize(gl, width);
     for (i = 0, max = 0; i < gl->used && i < width; i++) {
