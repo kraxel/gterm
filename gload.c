@@ -170,8 +170,8 @@ static gboolean gload_draw(GtkWidget *widget, cairo_t *cr, gpointer data)
     gdk_cairo_set_source_rgba(cr, &normal);
     for (i = 100; i < max; i += 100) {
         int y = (max - i) * height / max;
-        cairo_move_to(cr, 0, y + 0.5);
-        cairo_line_to(cr, width, y + 0.5);
+        cairo_move_to(cr, 0, y - 0.5);
+        cairo_line_to(cr, width, y - 0.5);
     }
     cairo_stroke(cr);
 
