@@ -16,11 +16,39 @@ typedef struct gload {
     GtkWidget *window;
     GtkWidget *label;
     GtkWidget *graph;
+
+    int *load1;
+    uint32_t used, total;
 } gload;
 
 /* ------------------------------------------------------------------------ */
 
-static int gload_read()
+static void gload_resize(gload *gl, uint32_t size)
+{
+    int *ptr;
+
+    if (size < gl->total)
+        return;
+
+    ptr = calloc(size, sizeof(int));
+    memcpy(ptr, gl->load1, gl->total * sizeof(int));
+    free(gl->load1);
+    gl->load1 = ptr;
+    gl->total = size;
+}
+
+static void gload_store(gload *gl, int load1)
+{
+    if (!gl->total)
+        gload_resize(gl, 10);
+    if (gl->used == gl->total) {
+        gl->used--;
+        memmove(gl->load1, gl->load1 + 1, gl->used * sizeof(int));
+    }
+    gl->load1[gl->used++] = load1;
+}
+
+static void gload_read(gload *gl)
 {
     char line[80];
     int file, ret, val, pos;
@@ -29,11 +57,11 @@ static int gload_read()
     /* read proc file */
     file = open("/proc/loadavg", O_RDONLY);
     if (file < 0)
-        return -1;
+        return;
     ret = read(file, line, sizeof(line) - 1);
     if (ret < 0) {
         close(file);
-        return -1;
+        return;
     }
     line[ret] = 0;
     close(file);
@@ -50,47 +78,102 @@ static int gload_read()
             continue;
         }
         if (line[pos] < '0'  || line[pos] > '9') {
-            return -1;
+            return;
         }
         vals[val] *= 10;
         vals[val] += line[pos] - '0';
     }
     if (val != 3)
-        return -1;
+        return;
 
-    fprintf(stderr, "%s: %d %d %d\n", __func__,
-            vals[0], vals[1], vals[2]);
-    return 0;
+    /* store value */
+    gload_store(gl, vals[0]);
+}
+
+static gboolean gload_timer(gpointer user_data)
+{
+    gload *gl = user_data;
+
+    gload_read(gl);
+    gtk_widget_queue_draw(gl->graph);
+    return G_SOURCE_CONTINUE;
+}
+
+/* ------------------------------------------------------------------------ */
+
+static int gload_brightness(GdkRGBA *color)
+{
+    /* scale: 0 -> 100 */
+    return (color->red * 30 +
+            color->green * 60 +
+            color->blue * 10);
+}
+
+static void gload_darken(GdkRGBA *src, GdkRGBA *dst, int percent)
+{
+    dst->red   = src->red   - src->red   * percent / 100;
+    dst->green = src->green - src->green * percent / 100;
+    dst->blue  = src->blue  - src->blue  * percent / 100;
+    dst->alpha = 1;
+}
+
+static void gload_lighten(GdkRGBA *src, GdkRGBA *dst, int percent)
+{
+    dst->red   = src->red   + (1-src->red)   * percent / 100;
+    dst->green = src->green + (1-src->green) * percent / 100;
+    dst->blue  = src->blue  + (1-src->blue)  * percent / 100;
+    dst->alpha = 1;
 }
 
 static gboolean gload_draw(GtkWidget *widget, cairo_t *cr, gpointer data)
 {
-//    gload *gl = data;
+    gload *gl = data;
     GtkStyleContext *context;
-    guint width, height;
-    GdkRGBA color;
+    GdkRGBA normal, dimmed;
+    guint width, height, i, idx, max;
+    bool darkmode;
 
     context = gtk_widget_get_style_context(widget);
     width = gtk_widget_get_allocated_width(widget);
     height = gtk_widget_get_allocated_height(widget);
 
-#if 1 /* gtk doc example code */
-    gtk_render_background(context, cr, 0, 0, width, height);
+    gtk_style_context_get_color(context, GTK_STATE_FLAG_NORMAL, &normal);
+    darkmode = gload_brightness(&normal) > 50;
+    if (darkmode)
+        gload_darken(&normal, &dimmed, 30);
+    else
+        gload_lighten(&normal, &dimmed, 30);
 
-    cairo_arc(cr,
-              width / 2.0, height / 2.0,
-              MIN (width, height) / 2.0,
-              0, 2 * G_PI);
+    gload_resize(gl, width);
+    for (i = 0, max = 0; i < gl->used && i < width; i++) {
+        idx = gl->used > width ? i + gl->used - width : i;
+        if (max < gl->load1[idx])
+            max = gl->load1[idx];
+    }
+    max += 100;
+    max -= (max % 100);
 
-    gtk_style_context_get_color(context,
-                                gtk_style_context_get_state(context),
-                                &color);
-    gdk_cairo_set_source_rgba(cr, &color);
-    cairo_fill(cr);
-#endif
+    cairo_set_line_width(cr, 1);
+    gdk_cairo_set_source_rgba(cr, &dimmed);
+    for (i = 0; i < gl->used && i < width; i++) {
+        idx = gl->used > width ? i + gl->used - width : i;
+        cairo_move_to(cr, i - 0.5, (max - gl->load1[idx]) * height / max - 0.5);
+        cairo_line_to(cr, i - 0.5, height - 0.5);
+    }
+    cairo_stroke(cr);
+
+    gdk_cairo_set_source_rgba(cr, &normal);
+    for (i = 100; i < max; i += 100) {
+        int y = (max - i) * height / max;
+        cairo_move_to(cr, 0, y + 0.5);
+        cairo_line_to(cr, width, y + 0.5);
+    }
+    cairo_stroke(cr);
 
     return FALSE;
 }
+
+/* ------------------------------------------------------------------------ */
 
 static void gload_window_destroy(GtkWidget *widget, gpointer data)
 {
@@ -126,10 +209,14 @@ static gload *gload_new(void)
 
 int main(int argc, char *argv[])
 {
+    gload *gl;
+
     gtk_init(&argc, &argv);
 
-    gload_new();
-    gload_read();
+    gl = gload_new();
+    gload_read(gl);
+    g_timeout_add_seconds(1, gload_timer, gl);
+
     gtk_main();
     return 0;
 }
