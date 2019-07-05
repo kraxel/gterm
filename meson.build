@@ -20,3 +20,4 @@ executable('gload',
            sources      : [ 'gload.c' ],
            dependencies : [ gtk_dep ],
            install      : true)
+install_man('gload.1')
