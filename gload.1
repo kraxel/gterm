@@ -16,7 +16,31 @@ is a load average monitor, inspired by xload.
 \#
 \#
 .SH OPTIONS
-No config options yet.
+.TP
+.BI -label " text"
+The text for the label.  Default is the hostname.
+.br
+Config file key: label.
+.TP
+.BI -update " secs"
+Update interval.  Default is 10 seconds.
+.br
+Config file key: update.
+\#
+\#
+.SH "CONFIG FILE"
+.BR gload
+reads the configuration from the
+.BR ~/.config/gload.conf
+config file.
+A "[default]" section holds the config options.
+Example:
+.P
+.in +4n
+[default]
+.br
+update=5
+.in
 \#
 \#
 .SH "SEE ALSO"

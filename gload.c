@@ -10,6 +10,22 @@
 
 #include <gtk/gtk.h>
 
+#include "gcfg.h"
+
+/* ------------------------------------------------------------------------ */
+
+#define GLOAD_CFG_FILENAME              ".config/gload.conf"
+
+#define GLOAD_CFG_KEY_LABEL             "label"
+#define GLOAD_CFG_KEY_UPDATE            "update"
+
+static const gcfg_opt gload_opts[] = {
+    { .opt = "label",         .key = GLOAD_CFG_KEY_LABEL         },
+    { .opt = "update",        .key = GLOAD_CFG_KEY_UPDATE        },
+    { .opt = "name",          .key = GCFG_KEY_PROFILE            },
+    { .opt = "class",         .key = GCFG_KEY_PROFILE            },
+};
+
 /* ------------------------------------------------------------------------ */
 
 typedef struct gload {
@@ -19,6 +35,8 @@ typedef struct gload {
 
     int *load1;
     uint32_t used, total;
+
+    GKeyFile *cfg;
 } gload;
 
 /* ------------------------------------------------------------------------ */
@@ -153,11 +171,14 @@ static void gload_window_destroy(GtkWidget *widget, gpointer data)
     gtk_main_quit();
 }
 
-static gload *gload_new(void)
+static gload *gload_new(GKeyFile *cfg)
 {
     struct utsname uts;
     GtkWidget *vbox;
     gload *gl = g_new0(gload, 1);
+    const char *label;
+
+    gl->cfg = cfg;
 
     gl->window = gtk_window_new(GTK_WINDOW_TOPLEVEL);
     g_signal_connect(G_OBJECT(gl->window), "destroy",
@@ -166,8 +187,12 @@ static gload *gload_new(void)
     vbox = gtk_box_new(GTK_ORIENTATION_VERTICAL, 0);
     gtk_container_add(GTK_CONTAINER(gl->window), vbox);
 
-    uname(&uts);
-    gl->label = gtk_label_new(uts.nodename);
+    label = gcfg_get(gl->cfg, GLOAD_CFG_KEY_LABEL);
+    if (!label) {
+        uname(&uts);
+        label = uts.nodename;
+    }
+    gl->label = gtk_label_new(label);
     gtk_label_set_xalign(GTK_LABEL(gl->label), 0);
     gtk_box_pack_start(GTK_BOX(vbox), gl->label, false, false, 0);
 
@@ -183,13 +208,46 @@ static gload *gload_new(void)
 
 int main(int argc, char *argv[])
 {
+    char *filename;
+    GKeyFile *cfg;
     gload *gl;
+    const gcfg_opt *opt;
+    const char *valstr;
+    int i, value;
 
     gtk_init(&argc, &argv);
 
-    gl = gload_new();
+    cfg = g_key_file_new();
+    filename = g_strdup_printf("%s/%s", getenv("HOME"), GLOAD_CFG_FILENAME);
+    g_key_file_load_from_file(cfg, filename, G_KEY_FILE_NONE, NULL);
+    g_free(filename);
+
+    for (i = 1; i < argc;) {
+        opt = gcfg_opt_find(gload_opts, ARRAY_SIZE(gload_opts), argv[i]);
+        if (!opt) {
+            fprintf(stderr, "unknown option: %s\n", argv[i]);
+            exit(1);
+        }
+        if (opt->is_bool) {
+            if (argv[i][0] == '-')
+                gcfg_set(cfg, opt->key, "true");
+            i++;
+        } else {
+            if (i + 1 == argc) {
+                fprintf(stderr, "missing argument for: %s\n", argv[i]);
+                exit(1);
+            }
+            gcfg_set(cfg, opt->key, argv[i+1]);
+            i += 2;
+        }
+    }
+
+    gl = gload_new(cfg);
     gload_read(gl);
-    g_timeout_add_seconds(10, gload_timer, gl);
+
+    valstr = gcfg_get(gl->cfg, GLOAD_CFG_KEY_UPDATE);
+    value = valstr ? atoi(valstr) : 10;
+    g_timeout_add_seconds(value, gload_timer, gl);
 
     gtk_main();
     return 0;

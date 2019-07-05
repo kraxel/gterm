@@ -17,7 +17,7 @@ install_data('gterm.desktop',
 	     install_dir : 'share/applications')
 
 executable('gload',
-           sources      : [ 'gload.c' ],
+           sources      : [ 'gload.c', 'gcfg.c' ],
            dependencies : [ gtk_dep ],
            install      : true)
 install_man('gload.1')
