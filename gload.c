@@ -18,12 +18,15 @@
 
 #define GLOAD_CFG_KEY_LABEL             "label"
 #define GLOAD_CFG_KEY_UPDATE            "update"
+#define GLOAD_CFG_KEY_HIGHLIGHT         "highlight"
 
 static const gcfg_opt gload_opts[] = {
     { .opt = "label",         .key = GLOAD_CFG_KEY_LABEL         },
     { .opt = "update",        .key = GLOAD_CFG_KEY_UPDATE        },
     { .opt = "name",          .key = GCFG_KEY_PROFILE            },
     { .opt = "class",         .key = GCFG_KEY_PROFILE            },
+    { .opt = "hl",            .key = GLOAD_CFG_KEY_HIGHLIGHT     },
+    { .opt = "highlight",     .key = GLOAD_CFG_KEY_HIGHLIGHT     },
 };
 
 /* ------------------------------------------------------------------------ */
@@ -124,13 +127,19 @@ static gboolean gload_draw(GtkWidget *widget, cairo_t *cr, gpointer data)
     gload *gl = data;
     GtkStyleContext *context;
     GdkRGBA normal, dimmed;
+    const char *highlight;
     guint width, height, i, idx, max;
 
     context = gtk_widget_get_style_context(widget);
     width = gtk_widget_get_allocated_width(widget);
     height = gtk_widget_get_allocated_height(widget);
 
-    gtk_style_context_get_color(context, GTK_STATE_FLAG_NORMAL, &normal);
+    highlight = gcfg_get(gl->cfg, GLOAD_CFG_KEY_HIGHLIGHT);
+    if (highlight) {
+        gdk_rgba_parse(&normal, highlight);
+    } else {
+        gtk_style_context_get_color(context, GTK_STATE_FLAG_NORMAL, &normal);
+    }
     dimmed = normal;
     normal.alpha = 1.0;
     dimmed.alpha = 0.6;
