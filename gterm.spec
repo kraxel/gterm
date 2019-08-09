@@ -7,6 +7,7 @@ Source:       %{name}-%{version}.tar.gz
 
 BuildRequires: gcc binutils
 BuildRequires: meson ninja-build
+BuildRequires: pkgconfig(glib-2.0)
 BuildRequires: pkgconfig(gtk+-3.0)
 BuildRequires: pkgconfig(vte-2.91)
 

@@ -5,12 +5,13 @@ add_global_arguments('-D_POSIX_SOURCE=1', language : 'c')
 add_global_arguments('-D_GNU_SOURCE=1', language : 'c')
 
 # pkg-config deps
-gtk_dep = dependency('gtk+-3.0', method: 'pkg-config')
-vte_dep = dependency('vte-2.91', method: 'pkg-config')
+glib_dep = dependency('glib-2.0', method: 'pkg-config')
+gtk_dep  = dependency('gtk+-3.0', method: 'pkg-config')
+vte_dep  = dependency('vte-2.91', method: 'pkg-config')
 
 executable('gterm',
            sources      : [ 'gterm.c', 'gcfg.c' ],
-           dependencies : [ gtk_dep, vte_dep ],
+           dependencies : [ glib_dep, gtk_dep, vte_dep ],
            install      : true)
 install_man('gterm.1')
 install_data('gterm.desktop',
@@ -18,6 +19,6 @@ install_data('gterm.desktop',
 
 executable('gload',
            sources      : [ 'gload.c', 'gcfg.c' ],
-           dependencies : [ gtk_dep ],
+           dependencies : [ glib_dep, gtk_dep ],
            install      : true)
 install_man('gload.1')
