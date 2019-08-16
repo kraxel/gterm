@@ -19,14 +19,19 @@
 #define GLOAD_CFG_KEY_LABEL             "label"
 #define GLOAD_CFG_KEY_UPDATE            "update"
 #define GLOAD_CFG_KEY_HIGHLIGHT         "highlight"
+#define GLOAD_CFG_KEY_FONTNAME          "fontname"
 
 static const gcfg_opt gload_opts[] = {
+    /* xload style */
     { .opt = "label",         .key = GLOAD_CFG_KEY_LABEL         },
     { .opt = "update",        .key = GLOAD_CFG_KEY_UPDATE        },
     { .opt = "name",          .key = GCFG_KEY_PROFILE            },
     { .opt = "class",         .key = GCFG_KEY_PROFILE            },
     { .opt = "hl",            .key = GLOAD_CFG_KEY_HIGHLIGHT     },
     { .opt = "highlight",     .key = GLOAD_CFG_KEY_HIGHLIGHT     },
+
+    /* gload only */
+    { .opt = "font",          .key = GLOAD_CFG_KEY_FONTNAME      },
 };
 
 /* ------------------------------------------------------------------------ */
@@ -185,7 +190,8 @@ static gload *gload_new(GKeyFile *cfg)
     struct utsname uts;
     GtkWidget *vbox;
     gload *gl = g_new0(gload, 1);
-    const char *label;
+    const char *label, *fontname, *highlight;
+    char *markup;
 
     gl->cfg = cfg;
 
@@ -205,8 +211,22 @@ static gload *gload_new(GKeyFile *cfg)
     gtk_label_set_xalign(GTK_LABEL(gl->label), 0);
     gtk_box_pack_start(GTK_BOX(vbox), gl->label, false, false, 0);
 
+    fontname = gcfg_get(gl->cfg, GLOAD_CFG_KEY_FONTNAME);
+    highlight = gcfg_get(gl->cfg, GLOAD_CFG_KEY_HIGHLIGHT);
+    markup = g_strdup_printf("<span%s%s%s%s%s%s>%s</span>",
+                             fontname  ? " font='"  : "",
+                             fontname  ? fontname   : "",
+                             fontname  ? "'"        : "",
+                             highlight ? " color='" : "",
+                             highlight ? highlight  : "",
+                             highlight ? "'"        : "",
+                             label);
+    fprintf(stderr, "%s\n", markup);
+    gtk_label_set_markup(GTK_LABEL(gl->label), markup);
+    g_free(markup);
+
     gl->graph = gtk_drawing_area_new();
-    gtk_widget_set_size_request(gl->graph, 100, 70);
+    gtk_widget_set_size_request(gl->graph, 200, 100);
     g_signal_connect(G_OBJECT(gl->graph), "draw",
                      G_CALLBACK(gload_draw), gl);
     gtk_box_pack_start(GTK_BOX(vbox), gl->graph, true, true, 0);
