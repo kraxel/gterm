@@ -221,7 +221,6 @@ static gload *gload_new(GKeyFile *cfg)
                              highlight ? highlight  : "",
                              highlight ? "'"        : "",
                              label);
-    fprintf(stderr, "%s\n", markup);
     gtk_label_set_markup(GTK_LABEL(gl->label), markup);
     g_free(markup);
 
