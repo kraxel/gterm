@@ -20,6 +20,7 @@
 #define GLOAD_CFG_KEY_UPDATE            "update"
 #define GLOAD_CFG_KEY_HIGHLIGHT         "highlight"
 #define GLOAD_CFG_KEY_FONTNAME          "fontname"
+#define GLOAD_CFG_KEY_ALPHA             "alpha"
 
 static const gcfg_opt gload_opts[] = {
     /* xload style */
@@ -32,6 +33,7 @@ static const gcfg_opt gload_opts[] = {
 
     /* gload only */
     { .opt = "font",          .key = GLOAD_CFG_KEY_FONTNAME      },
+    { .opt = "alpha",         .key = GLOAD_CFG_KEY_ALPHA         },
 };
 
 /* ------------------------------------------------------------------------ */
@@ -132,7 +134,7 @@ static gboolean gload_draw(GtkWidget *widget, cairo_t *cr, gpointer data)
     gload *gl = data;
     GtkStyleContext *context;
     GdkRGBA normal, dimmed;
-    const char *highlight;
+    const char *highlight, *alpha;
     guint width, height, i, idx, max;
 
     context = gtk_widget_get_style_context(widget);
@@ -145,9 +147,15 @@ static gboolean gload_draw(GtkWidget *widget, cairo_t *cr, gpointer data)
     } else {
         gtk_style_context_get_color(context, GTK_STATE_FLAG_NORMAL, &normal);
     }
-    dimmed = normal;
     normal.alpha = 1.0;
-    dimmed.alpha = 0.6;
+
+    dimmed = normal;
+    alpha = gcfg_get(gl->cfg, GLOAD_CFG_KEY_ALPHA);
+    if (alpha) {
+        dimmed.alpha = atoi(alpha) / 100.0;
+    } else {
+        dimmed.alpha = 0.6;
+    }
 
     gload_resize(gl, width);
     for (i = 0, max = 0; i < gl->used && i < width; i++) {
