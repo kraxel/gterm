@@ -488,6 +488,8 @@ int main(int argc, char *argv[])
 
     gt = gterm_new(cfg);
     if (eopt) {
+        if (!gcfg_get(cfg, GTERM_CFG_KEY_TITLE))
+            gtk_window_set_title(GTK_WINDOW(gt->window), argv[eopt]);
         gterm_spawn(gt, argv + eopt);
     } else {
         gterm_spawn_shell(gt);
