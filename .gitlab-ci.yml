@@ -21,6 +21,7 @@ build_centos8:
   stage: build
   image: centos:8
   script:
+    - dnf config-manager --set-enabled cr
     - dnf repolist --all
     - *builddep_dnf
     - *build_meson
