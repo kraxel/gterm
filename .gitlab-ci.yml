@@ -24,6 +24,7 @@ build_centos8:
     - dnf install -y 'dnf-command(config-manager)'
     - dnf config-manager --set-enabled cr
     - dnf config-manager --set-enabled Devel
+    - dnf config-manager --set-enabled PowerTools
     - dnf repolist --all
     - *builddep_dnf
     - *build_meson
