@@ -1,0 +1,11 @@
+stages:
+  - build
+
+build_fedora:
+  stage: build
+  image: fedora:latest
+  script:
+    - dnf builddep -y *.spec
+    - mkdir build-meson
+    - meson . build-meson
+    - ninja-build -C build-meson 
