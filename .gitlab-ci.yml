@@ -8,7 +8,7 @@ stages:
 .build_meson: &build_meson
   - mkdir build-meson
   - meson . build-meson
-  - ninja-build -C build-meson 
+  - ninja-build -C build-meson
 
 build_fedora:
   stage: build
@@ -21,6 +21,7 @@ build_centos8:
   stage: build
   image: centos:8
   script:
+    - dnf repolist --all
     - *builddep_dnf
     - *build_meson
 
