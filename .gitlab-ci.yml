@@ -5,11 +5,22 @@ stages:
   - dnf install -y 'dnf-command(builddep)'
   - dnf builddep -y *.spec
 
+.build_meson: &build_meson
+  - mkdir build-meson
+  - meson . build-meson
+  - ninja-build -C build-meson 
+
 build_fedora:
   stage: build
   image: fedora:latest
   script:
     - *builddep_dnf
-    - mkdir build-meson
-    - meson . build-meson
-    - ninja-build -C build-meson 
+    - *build_meson
+
+build_centos8:
+  stage: build
+  image: centos:8
+  script:
+    - *builddep_dnf
+    - *build_meson
+
