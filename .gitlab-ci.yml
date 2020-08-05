@@ -5,6 +5,7 @@ build_fedora:
   stage: build
   image: fedora:latest
   script:
+    - dnf install -y 'dnf-command(builddep)'
     - dnf builddep -y *.spec
     - mkdir build-meson
     - meson . build-meson
