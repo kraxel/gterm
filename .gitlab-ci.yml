@@ -22,3 +22,11 @@ build_centos8:
   script:
     - *build_meson
 
+build_centos7:
+  stage: build
+  image: registry.gitlab.com/kraxel/rpm-package-builder:centos7
+  before_script:
+    - yum-builddep -y *.spec
+  script:
+    - *build_meson
+
