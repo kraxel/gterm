@@ -1,10 +1,6 @@
 stages:
   - build
 
-.builddep_dnf: &builddep_dnf
-  - dnf install -y 'dnf-command(builddep)'
-  - dnf builddep -y *.spec
-
 .build_meson: &build_meson
   - mkdir build-meson
   - meson . build-meson
@@ -12,19 +8,17 @@ stages:
 
 build_fedora:
   stage: build
-  image: fedora:latest
+  image: registry.gitlab.com/kraxel/rpm-package-builder:fedora
   before_script:
-    - *builddep_dnf
+    - dnf builddep -y *.spec
   script:
     - *build_meson
 
 build_centos8:
   stage: build
-  image: centos:8
+  image: registry.gitlab.com/kraxel/rpm-package-builder:centos8
   before_script:
-    - dnf install -y 'dnf-command(config-manager)'
-    - dnf config-manager --set-enabled PowerTools
-    - *builddep_dnf
+    - dnf builddep -y *.spec
   script:
     - *build_meson
 
