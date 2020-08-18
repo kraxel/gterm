@@ -1,5 +1,6 @@
 stages:
   - build
+  - rpms
 
 .build_meson: &build_meson
   - mkdir build-meson
@@ -30,3 +31,10 @@ build_centos7:
   script:
     - *build_meson
 
+tito_fedora:
+  stage: rpms
+  image: registry.gitlab.com/kraxel/rpm-package-builder:fedora
+  before_script:
+    - dnf builddep -y *.spec
+  script:
+    - tito build --test --rpm
