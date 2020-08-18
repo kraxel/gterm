@@ -37,4 +37,8 @@ tito_fedora:
   before_script:
     - dnf builddep -y *.spec
   script:
-    - tito build --test --rpm
+    - tito build --test --rpm --output rpms
+    - createrepo rpms
+  artifacts:
+    paths:
+      - rpms/
