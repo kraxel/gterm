@@ -52,6 +52,8 @@ pages:
   script:
     - mkdir public
     - mv rpms-fedora public/fedora
+    - find public -type f | sort | while read l; do f=${l#public/}; echo "<a href=\"$f\">$f</a><br>"; done > index.html
+    - mv index.html public
   artifacts:
     paths:
       - public/
