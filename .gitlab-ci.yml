@@ -53,7 +53,7 @@ pages:
     - mkdir public
     - mv rpms-fedora public/fedora
     - dnf install -y tree
-    - tree -H . public > index.html
+    - tree --charset utf8 -H . public > index.html
     - mv index.html public
   artifacts:
     paths:
