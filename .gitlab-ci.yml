@@ -1,6 +1,7 @@
 stages:
   - build
   - rpms
+  - repo
 
 .build_meson: &build_meson
   - mkdir build-meson
@@ -44,6 +45,7 @@ tito_fedora:
       - rpms/
 
 pages:
+  stage: repo
   dependencies:
     - build_fedora
   script:
