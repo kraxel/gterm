@@ -42,3 +42,12 @@ tito_fedora:
   artifacts:
     paths:
       - rpms/
+
+pages:
+  dependencies:
+    - build_fedora
+  script:
+    - mv rpms public
+  artifacts:
+    paths:
+      - public/
