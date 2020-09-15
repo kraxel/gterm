@@ -38,18 +38,20 @@ tito_fedora:
   before_script:
     - dnf builddep -y *.spec
   script:
-    - tito build --test --rpm --output rpms
-    - createrepo rpms
+    - tito build --test --rpm --output rpms-fedora
+    - createrepo rpms-fedora
   artifacts:
     paths:
-      - rpms/
+      - rpms-fedora/
 
 pages:
   stage: repo
+  image: registry.gitlab.com/kraxel/rpm-package-builder:fedora
   dependencies:
-    - build_fedora
+    - tito_fedora
   script:
-    - mv rpms public
+    - mkdir public
+    - mv rpms-fedora public/fedora
   artifacts:
     paths:
       - public/
