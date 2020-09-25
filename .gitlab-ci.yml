@@ -60,7 +60,7 @@ tito_centos7:
   stage: rpms
   image: registry.gitlab.com/kraxel/rpm-package-builder:centos7
   before_script:
-    - dnf builddep -y *.spec
+    - yum-builddep -y *.spec
   script:
     - tito build --test --rpm --output rpms-centos7
     - createrepo rpms-centos7
