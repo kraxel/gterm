@@ -34,7 +34,7 @@ build_centos7:
 
 include:
   - project: 'kraxel/rpm-package-builder'
-    file: 'gitlab-ci-rpms-tito.yml'
+    file: 'gitlab-ci-rpms-tito-devel.yml'
 
 boot-aarch64:
   stage: rpms
