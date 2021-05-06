@@ -1,4 +1,5 @@
 stages:
+  - boot
   - build
   - rpms
   - repo
@@ -10,7 +11,7 @@ include:
     file: 'gitlab-ci-rpms-tito.yml'
 
 boot-aarch64:
-  stage: build
+  stage: boot
   rules:
     - if: '$BUILD_AARCH64 == "yes"'
   trigger:
