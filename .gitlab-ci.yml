@@ -6,8 +6,6 @@ stages:
 include:
   - project: 'kraxel/rpm-package-builder'
     file: 'gitlab-ci-build-meson.yml'
-
-include:
   - project: 'kraxel/rpm-package-builder'
     file: 'gitlab-ci-rpms-tito.yml'
 
