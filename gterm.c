@@ -198,7 +198,7 @@ static void gterm_vte_configure(gterm *gt)
     } else if (fontname) {
         fontdesc = g_strdup_printf("%s", fontname);
     } else if (fontsize) {
-        fontdesc = g_strdup_printf("%s", fontsize);
+        fontdesc = g_strdup_printf("mono %s", fontsize);
     } else {
         fontdesc = NULL;
     }
