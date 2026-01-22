@@ -1,7 +1,3 @@
-[![Gitlab Status](https://gitlab.com/kraxel/gterm/badges/master/pipeline.svg)](https://gitlab.com/kraxel/gterm/-/pipelines)
-[![Travis Status](https://travis-ci.com/kraxel/gterm.svg?branch=master)](https://travis-ci.com/gitlab/kraxel/gterm)
-[![Copr Status](https://copr.fedorainfracloud.org/coprs/kraxel/mine.git/package/gterm/status_image/last_build.png)](https://copr.fedorainfracloud.org/coprs/kraxel/mine.git/package/gterm/)
-
 # gterm
 
 Terminal application, based on gtk3 and vte.  The plan is to have a
