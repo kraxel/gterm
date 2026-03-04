@@ -6,8 +6,8 @@ add_global_arguments('-D_GNU_SOURCE=1', language : 'c')
 
 # pkg-config deps
 glib_dep = dependency('glib-2.0', method: 'pkg-config')
-gtk_dep  = dependency('gtk+-3.0', method: 'pkg-config')
-vte_dep  = dependency('vte-2.91', method: 'pkg-config')
+gtk_dep  = dependency('gtk4', method: 'pkg-config')
+vte_dep  = dependency('vte-2.91-gtk4', method: 'pkg-config')
 
 executable('gterm',
            sources      : [ 'gterm.c', 'gcfg.c' ],

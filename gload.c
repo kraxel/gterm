@@ -47,6 +47,7 @@ typedef struct gload {
     uint32_t used, total;
 
     GKeyFile *cfg;
+    GMainLoop *loop;
 } gload;
 
 /* ------------------------------------------------------------------------ */
@@ -129,23 +130,22 @@ static gboolean gload_timer(gpointer user_data)
 
 /* ------------------------------------------------------------------------ */
 
-static gboolean gload_draw(GtkWidget *widget, cairo_t *cr, gpointer data)
+static void gload_draw(GtkDrawingArea *area,
+                       cairo_t *cr,
+                       int width,
+                       int height,
+                       gpointer data)
 {
     gload *gl = data;
-    GtkStyleContext *context;
     GdkRGBA normal, dimmed;
     const char *highlight, *alpha;
-    guint width, height, i, idx, max;
-
-    context = gtk_widget_get_style_context(widget);
-    width = gtk_widget_get_allocated_width(widget);
-    height = gtk_widget_get_allocated_height(widget);
+    guint i, idx, max;
 
     highlight = gcfg_get(gl->cfg, GLOAD_CFG_KEY_HIGHLIGHT);
     if (highlight) {
         gdk_rgba_parse(&normal, highlight);
     } else {
-        gtk_style_context_get_color(context, GTK_STATE_FLAG_NORMAL, &normal);
+        gdk_rgba_parse(&normal, "#ffffff");
     }
     normal.alpha = 1.0;
 
@@ -182,15 +182,16 @@ static gboolean gload_draw(GtkWidget *widget, cairo_t *cr, gpointer data)
         cairo_line_to(cr, width, y - 0.5);
     }
     cairo_stroke(cr);
-
-    return FALSE;
 }
 
 /* ------------------------------------------------------------------------ */
 
-static void gload_window_destroy(GtkWidget *widget, gpointer data)
+static gboolean gload_window_close_request(GtkWindow *window, gpointer data)
 {
-    gtk_main_quit();
+    gload *gl = data;
+
+    g_main_loop_quit(gl->loop);
+    return FALSE;
 }
 
 static gload *gload_new(GKeyFile *cfg)
@@ -202,13 +203,14 @@ static gload *gload_new(GKeyFile *cfg)
     char *markup;
 
     gl->cfg = cfg;
+    gl->loop = g_main_loop_new(NULL, FALSE);
 
-    gl->window = gtk_window_new(GTK_WINDOW_TOPLEVEL);
-    g_signal_connect(G_OBJECT(gl->window), "destroy",
-                     G_CALLBACK(gload_window_destroy), gl);
+    gl->window = gtk_window_new();
+    g_signal_connect(G_OBJECT(gl->window), "close-request",
+                     G_CALLBACK(gload_window_close_request), gl);
 
     vbox = gtk_box_new(GTK_ORIENTATION_VERTICAL, 0);
-    gtk_container_add(GTK_CONTAINER(gl->window), vbox);
+    gtk_window_set_child(GTK_WINDOW(gl->window), vbox);
 
     label = gcfg_get(gl->cfg, GLOAD_CFG_KEY_LABEL);
     if (!label) {
@@ -217,7 +219,7 @@ static gload *gload_new(GKeyFile *cfg)
     }
     gl->label = gtk_label_new(label);
     gtk_label_set_xalign(GTK_LABEL(gl->label), 0);
-    gtk_box_pack_start(GTK_BOX(vbox), gl->label, false, false, 0);
+    gtk_box_append(GTK_BOX(vbox), gl->label);
 
     fontname = gcfg_get(gl->cfg, GLOAD_CFG_KEY_FONTNAME);
     highlight = gcfg_get(gl->cfg, GLOAD_CFG_KEY_HIGHLIGHT);
@@ -234,11 +236,10 @@ static gload *gload_new(GKeyFile *cfg)
 
     gl->graph = gtk_drawing_area_new();
     gtk_widget_set_size_request(gl->graph, 200, 100);
-    g_signal_connect(G_OBJECT(gl->graph), "draw",
-                     G_CALLBACK(gload_draw), gl);
-    gtk_box_pack_start(GTK_BOX(vbox), gl->graph, true, true, 0);
+    gtk_drawing_area_set_draw_func(GTK_DRAWING_AREA(gl->graph), gload_draw, gl, NULL);
+    gtk_box_append(GTK_BOX(vbox), gl->graph);
 
-    gtk_widget_show_all(gl->window);
+    gtk_window_present(GTK_WINDOW(gl->window));
     return gl;
 }
 
@@ -251,7 +252,7 @@ int main(int argc, char *argv[])
     const char *valstr;
     int i, value;
 
-    gtk_init(&argc, &argv);
+    gtk_init();
 
     cfg = g_key_file_new();
     filename = g_strdup_printf("%s/%s", getenv("HOME"), GLOAD_CFG_FILENAME);
@@ -285,6 +286,6 @@ int main(int argc, char *argv[])
     value = valstr ? atoi(valstr) : 10;
     g_timeout_add_seconds(value, gload_timer, gl);
 
-    gtk_main();
+    g_main_loop_run(gl->loop);
     return 0;
 }
