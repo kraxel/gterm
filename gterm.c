@@ -7,6 +7,7 @@
 #include <pwd.h>
 
 #include <sys/types.h>
+#include <sys/wait.h>
 
 #include <gtk/gtk.h>
 #include <vte/vte.h>
@@ -141,7 +142,7 @@ static void gterm_vte_button_press(GtkGestureClick *gesture,
                                    gdouble y,
                                    gpointer user_data)
 {
-    GdkModifierType state = 0;
+    GdkModifierType state;
     guint button;
     gterm *gt = user_data;
     graphene_rect_t point_to;
@@ -153,7 +154,7 @@ static void gterm_vte_button_press(GtkGestureClick *gesture,
     if (!(button == 1 || button == 2 || button == 3))
         return;
 
-    gtk_event_controller_get_current_event_state(GTK_EVENT_CONTROLLER(gesture), &state);
+    state = gtk_event_controller_get_current_event_state(GTK_EVENT_CONTROLLER(gesture));
     if (!(state & GDK_CONTROL_MASK))
         return;
 
@@ -240,23 +241,12 @@ static void gterm_vte_configure(gterm *gt)
 
 static void gterm_vte_geometry_hints(gterm *gt)
 {
-    gint cw = vte_terminal_get_char_width(VTE_TERMINAL(gt->terminal));
-    gint ch = vte_terminal_get_char_height(VTE_TERMINAL(gt->terminal));
-    GdkGeometry hints = {
-        .min_width   = cw,
-        .min_height  = ch,
-        .base_width  = cw,
-        .base_height = ch,
-        .width_inc   = cw,
-        .height_inc  = ch,
-    };
-
-    gtk_window_set_geometry_hints(GTK_WINDOW(gt->window),
-                                  GTK_WIDGET(gt->terminal),
-                                  &hints,
-                                  GDK_HINT_RESIZE_INC |
-                                  GDK_HINT_MIN_SIZE |
-                                  GDK_HINT_BASE_SIZE);
+    /*
+     * GtkWindow geometry hints from GTK3 were removed in GTK4.
+     * Keep this helper as a no-op so existing callsites still
+     * document intent without relying on removed APIs.
+     */
+    (void)gt;
 }
 
 /* ------------------------------------------------------------------------ */
