@@ -4,6 +4,6 @@ jobs:
   build-ubuntu:
     runs-on: ubuntu-latest
     steps:
-      - run: apt install -y meson pkg-config libgtk-4-dev libvte-2.91-gtk4-dev
+      - run: sudo apt-get install -y meson pkg-config libgtk-4-dev libvte-2.91-gtk4-dev
       - run: meson setup . build-github
       - run: ninja-build -C build-github
