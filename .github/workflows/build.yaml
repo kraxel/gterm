@@ -7,4 +7,4 @@ jobs:
       - uses: actions/checkout@v6
       - run: sudo apt-get install -y meson ninja-build pkg-config libgtk-3-dev libvte-2.91-dev
       - run: meson setup . build-github
-      - run: ninja-build -C build-github
+      - run: ninja -C build-github
