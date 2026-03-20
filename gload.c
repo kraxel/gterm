@@ -126,7 +126,8 @@ static gboolean gload_timer(gpointer user_data)
     gload *gl = user_data;
 
     gload_read(gl);
-    gtk_widget_queue_draw(gl->graph);
+    if (gl->graph)
+        gtk_widget_queue_draw(gl->graph);
     return G_SOURCE_CONTINUE;
 }
 
@@ -193,21 +194,25 @@ static void gload_draw(GtkDrawingArea *drawing_area,
 static void gload_window_destroy(GtkWidget *widget, gpointer data)
 {
     gload *gl = data;
-    g_application_quit(G_APPLICATION(gl->app));
+    if (gl->app)
+        g_application_quit(G_APPLICATION(gl->app));
 }
 
-static gload *gload_new(GtkApplication *app, GKeyFile *cfg)
+static void gload_app_activate(GApplication *app, gpointer user_data)
 {
+    gload *gl = user_data;
     struct utsname uts;
     GtkWidget *vbox;
-    gload *gl = g_new0(gload, 1);
     char *label, *fontname, *highlight;
     char *markup;
 
-    gl->app = app;
-    gl->cfg = cfg;
+    if (gl->window) {
+        gtk_window_present(GTK_WINDOW(gl->window));
+        return;
+    }
 
-    gl->window = gtk_application_window_new(app);
+    gl->window = gtk_application_window_new(GTK_APPLICATION(app));
+    gtk_window_set_title(GTK_WINDOW(gl->window), "gload");
     g_signal_connect(G_OBJECT(gl->window), "destroy",
                      G_CALLBACK(gload_window_destroy), gl);
 
@@ -220,24 +225,28 @@ static gload *gload_new(GtkApplication *app, GKeyFile *cfg)
         label = g_strdup(uts.nodename);
     }
     gl->label = gtk_label_new(label);
-    gtk_label_set_xalign(GTK_LABEL(gl->label), 0);
-    gtk_box_append(GTK_BOX(vbox), gl->label);
+    if (gl->label) {
+        gtk_label_set_xalign(GTK_LABEL(gl->label), 0);
+        gtk_box_append(GTK_BOX(vbox), gl->label);
 
-    fontname = gcfg_get(gl->cfg, GLOAD_CFG_KEY_FONTNAME);
-    highlight = gcfg_get(gl->cfg, GLOAD_CFG_KEY_HIGHLIGHT);
-    markup = g_strdup_printf("<span%s%s%s%s%s%s>%s</span>",
-                             fontname  ? " font='"  : "",
-                             fontname  ? fontname   : "",
-                             fontname  ? "'"        : "",
-                             highlight ? " color='" : "",
-                             highlight ? highlight  : "",
-                             highlight ? "'"        : "",
-                             label);
-    gtk_label_set_markup(GTK_LABEL(gl->label), markup);
-    g_free(markup);
+        fontname = gcfg_get(gl->cfg, GLOAD_CFG_KEY_FONTNAME);
+        highlight = gcfg_get(gl->cfg, GLOAD_CFG_KEY_HIGHLIGHT);
+        markup = g_strdup_printf("<span%s%s%s%s%s%s>%s</span>",
+                                 fontname  ? " font='"  : "",
+                                 fontname  ? fontname   : "",
+                                 fontname  ? "'"        : "",
+                                 highlight ? " color='" : "",
+                                 highlight ? highlight  : "",
+                                 highlight ? "'"        : "",
+                                 label ? label : "");
+        if (markup) {
+            gtk_label_set_markup(GTK_LABEL(gl->label), markup);
+            g_free(markup);
+        }
+        g_free(fontname);
+        g_free(highlight);
+    }
     g_free(label);
-    g_free(fontname);
-    g_free(highlight);
 
     gl->graph = gtk_drawing_area_new();
     gtk_widget_set_size_request(gl->graph, 200, 100);
@@ -246,11 +255,6 @@ static gload *gload_new(GtkApplication *app, GKeyFile *cfg)
     gtk_widget_set_vexpand(gl->graph, TRUE);
 
     gtk_window_present(GTK_WINDOW(gl->window));
-    return gl;
-}
-
-static void gload_app_activate(GApplication *app, gpointer user_data)
-{
 }
 
 int main(int argc, char *argv[])
@@ -262,12 +266,15 @@ int main(int argc, char *argv[])
     char *valstr;
     int i, value;
 
-    gtk_init();
+    gl = g_new0(gload, 1);
 
     cfg = g_key_file_new();
     filename = g_strdup_printf("%s/%s", g_get_home_dir(), GLOAD_CFG_FILENAME);
-    g_key_file_load_from_file(cfg, filename, G_KEY_FILE_NONE, NULL);
-    g_free(filename);
+    if (filename) {
+        g_key_file_load_from_file(cfg, filename, G_KEY_FILE_NONE, NULL);
+        g_free(filename);
+    }
+    gl->cfg = cfg;
 
     for (i = 1; i < argc;) {
         opt = gcfg_opt_find(gload_opts, ARRAY_SIZE(gload_opts), argv[i]);
@@ -289,11 +296,9 @@ int main(int argc, char *argv[])
         }
     }
 
-    GtkApplication *app = gtk_application_new("org.gterm.load", G_APPLICATION_DEFAULT_FLAGS);
-    g_signal_connect(app, "activate", G_CALLBACK(gload_app_activate), NULL);
-    g_application_register(G_APPLICATION(app), NULL, NULL);
+    gl->app = gtk_application_new("org.gterm.load", G_APPLICATION_DEFAULT_FLAGS);
+    g_signal_connect(gl->app, "activate", G_CALLBACK(gload_app_activate), gl);
 
-    gl = gload_new(app, cfg);
     gload_read(gl);
 
     valstr = gcfg_get(gl->cfg, GLOAD_CFG_KEY_UPDATE);
@@ -301,13 +306,11 @@ int main(int argc, char *argv[])
     g_free(valstr);
     g_timeout_add_seconds(value, gload_timer, gl);
 
-    while (g_list_length(gtk_application_get_windows(app)) > 0) {
-        g_main_context_iteration(NULL, TRUE);
-    }
+    g_application_run(G_APPLICATION(gl->app), 0, NULL);
 
     free(gl->load1);
+    g_key_file_free(gl->cfg);
+    g_object_unref(gl->app);
     g_free(gl);
-    g_object_unref(app);
-    g_key_file_free(cfg);
     return 0;
 }

@@ -68,6 +68,10 @@ typedef struct gterm {
     GKeyFile *cfg;
     GPid pid;
     gint exit_code;
+
+    int argc;
+    char **argv;
+    int eopt;
 } gterm;
 
 typedef struct gterm_spawn_data {
@@ -84,7 +88,8 @@ static void gterm_spawn_cb(VteTerminal *terminal, GPid pid,
     if (error) {
         fprintf(stderr, "ERROR: %s\n", error->message);
         gt->exit_code = 1;
-        g_application_quit(G_APPLICATION(gt->app));
+        if (gt->app)
+            g_application_quit(G_APPLICATION(gt->app));
     } else {
         gt->pid = pid;
     }
@@ -94,19 +99,22 @@ static void gterm_spawn_cb(VteTerminal *terminal, GPid pid,
 
 static void gterm_spawn(gterm *gt, char *argv[])
 {
+    if (!argv || !argv[0])
+        return;
+
     gterm_spawn_data *sd = g_new0(gterm_spawn_data, 1);
     sd->gt = gt;
     sd->argv = g_strdupv(argv);
 
+    const char *home = g_get_home_dir();
+
     vte_terminal_spawn_async(VTE_TERMINAL(gt->terminal),
                              VTE_PTY_DEFAULT,
-                             NULL,
+                             home,
                              sd->argv,
                              NULL,
                              G_SPAWN_SEARCH_PATH,
-                             NULL,
-                             NULL,
-                             NULL,
+                             NULL, NULL, NULL,
                              -1,
                              NULL,
                              gterm_spawn_cb,
@@ -115,22 +123,16 @@ static void gterm_spawn(gterm *gt, char *argv[])
 
 static void gterm_spawn_shell(gterm *gt)
 {
-    struct passwd *pwent;
-    const char *shell;
+    char *shell = vte_get_user_shell();
     char *argv[2];
 
-    shell = getenv("SHELL");
-    if (!shell) {
-        pwent = getpwuid(getuid());
-        if (pwent)
-            shell = pwent->pw_shell;
-    }
     if (!shell)
-        shell = "/bin/sh";
+        shell = g_strdup("/bin/sh");
 
-    argv[0] = (char*)shell;
+    argv[0] = shell;
     argv[1] = NULL;
     gterm_spawn(gt, argv);
+    g_free(shell);
 }
 
 static void gterm_vte_child_exited(VteTerminal *vteterminal,
@@ -141,9 +143,11 @@ static void gterm_vte_child_exited(VteTerminal *vteterminal,
 
     if (WIFEXITED(status))
         gt->exit_code = WEXITSTATUS(status);
-    if (WIFSIGNALED(status))
+    else if (WIFSIGNALED(status))
         gt->exit_code = 1;
-    g_application_quit(G_APPLICATION(gt->app));
+
+    if (gt->app)
+        g_application_quit(G_APPLICATION(gt->app));
 }
 
 static void gterm_vte_window_title_changed(VteTerminal *vteterminal,
@@ -152,15 +156,22 @@ static void gterm_vte_window_title_changed(VteTerminal *vteterminal,
     gterm *gt = user_data;
     const char *str;
 
+    if (!gt || !gt->window)
+        return;
+
     str = vte_terminal_get_window_title(VTE_TERMINAL(gt->terminal));
-    if (str) {
-        gtk_window_set_title(GTK_WINDOW(gt->window), str);
+    if (str && *str) {
+        char *valid_str = g_utf8_make_valid(str, -1);
+        if (valid_str) {
+            gtk_window_set_title(GTK_WINDOW(gt->window), valid_str);
+            g_free(valid_str);
+        }
     }
 }
 
 static void gterm_vte_configure(gterm *gt)
 {
-    char *fontdesc;
+    char *fontdesc = NULL;
     char *fontname;
     char *fontsize;
     char *str;
@@ -177,14 +188,15 @@ static void gterm_vte_configure(gterm *gt)
         fontdesc = g_strdup_printf("%s", fontname);
     } else if (fontsize) {
         fontdesc = g_strdup_printf("mono %s", fontsize);
-    } else {
-        fontdesc = NULL;
     }
+
     if (fontdesc) {
         PangoFontDescription *font;
         font = pango_font_description_from_string(fontdesc);
-        vte_terminal_set_font(VTE_TERMINAL(gt->terminal), font);
-        pango_font_description_free(font);
+        if (font) {
+            vte_terminal_set_font(VTE_TERMINAL(gt->terminal), font);
+            pango_font_description_free(font);
+        }
         g_free(fontdesc);
     }
     g_free(fontname);
@@ -216,9 +228,11 @@ static void gterm_vte_configure(gterm *gt)
         state = vte_terminal_get_audible_bell(VTE_TERMINAL(gt->terminal));
     }
 
-    GAction *action = g_action_map_lookup_action(G_ACTION_MAP(gt->actions), "bell");
-    if (action) {
-        g_simple_action_set_state(G_SIMPLE_ACTION(action), g_variant_new_boolean(state));
+    if (gt->actions) {
+        GAction *action = g_action_map_lookup_action(G_ACTION_MAP(gt->actions), "bell");
+        if (action) {
+            g_simple_action_set_state(G_SIMPLE_ACTION(action), g_variant_new_boolean(state));
+        }
     }
     vte_terminal_set_audible_bell(VTE_TERMINAL(gt->terminal), state);
 
@@ -253,12 +267,15 @@ static void gterm_vte_configure(gterm *gt)
 static void gterm_menu_fullscreen_cb(GSimpleAction *action, GVariant *state, gpointer user_data)
 {
     gterm *gt = user_data;
+    if (!state || !gt) return;
     gboolean fullscreen = g_variant_get_boolean(state);
 
-    if (fullscreen) {
-        gtk_window_fullscreen(GTK_WINDOW(gt->window));
-    } else {
-        gtk_window_unfullscreen(GTK_WINDOW(gt->window));
+    if (gt->window) {
+        if (fullscreen) {
+            gtk_window_fullscreen(GTK_WINDOW(gt->window));
+        } else {
+            gtk_window_unfullscreen(GTK_WINDOW(gt->window));
+        }
     }
     g_simple_action_set_state(action, state);
 }
@@ -266,6 +283,7 @@ static void gterm_menu_fullscreen_cb(GSimpleAction *action, GVariant *state, gpo
 static void gterm_menu_bell_cb(GSimpleAction *action, GVariant *state, gpointer user_data)
 {
     gterm *gt = user_data;
+    if (!state || !gt) return;
     gboolean audible = g_variant_get_boolean(state);
 
     vte_terminal_set_audible_bell(VTE_TERMINAL(gt->terminal), audible);
@@ -275,12 +293,16 @@ static void gterm_menu_bell_cb(GSimpleAction *action, GVariant *state, gpointer 
 static void gterm_menu_font_cb(GSimpleAction *action, GVariant *state, gpointer user_data)
 {
     gterm *gt = user_data;
+    if (!state || !gt) return;
     const char *name = g_variant_get_string(state, NULL);
-    PangoFontDescription *font;
 
-    font = pango_font_description_from_string(name);
-    vte_terminal_set_font(VTE_TERMINAL(gt->terminal), font);
-    pango_font_description_free(font);
+    if (name && *name) {
+        PangoFontDescription *font = pango_font_description_from_string(name);
+        if (font) {
+            vte_terminal_set_font(VTE_TERMINAL(gt->terminal), font);
+            pango_font_description_free(font);
+        }
+    }
 
     g_simple_action_set_state(action, state);
 }
@@ -288,7 +310,8 @@ static void gterm_menu_font_cb(GSimpleAction *action, GVariant *state, gpointer 
 static void gterm_menu_reset_cb(GSimpleAction *action, GVariant *parameter, gpointer user_data)
 {
     gterm *gt = user_data;
-    vte_terminal_reset(VTE_TERMINAL(gt->terminal), true, true);
+    if (gt)
+        vte_terminal_reset(VTE_TERMINAL(gt->terminal), true, true);
 }
 
 static void gterm_fill_menu(gterm *gt)
@@ -339,11 +362,13 @@ static void gterm_fill_menu(gterm *gt)
         if (!fontsize)
             continue;
         char *fontdesc = g_strdup_printf("%s %s", fontname, fontsize);
-        GMenuItem *item = g_menu_item_new(fontdesc, NULL);
-        g_menu_item_set_action_and_target(item, "menu.font", "s", fontdesc);
-        g_menu_append_item(font_menu, item);
-        g_object_unref(item);
-        g_free(fontdesc);
+        if (fontdesc) {
+            GMenuItem *item = g_menu_item_new(fontdesc, NULL);
+            g_menu_item_set_action_and_target(item, "menu.font", "s", fontdesc);
+            g_menu_append_item(font_menu, item);
+            g_object_unref(item);
+            g_free(fontdesc);
+        }
         g_free(fontsize);
     }
     g_free(fontname);
@@ -363,8 +388,11 @@ static void gterm_click_pressed_cb(GtkGestureClick *gesture,
                                    gpointer          user_data)
 {
     gterm *gt = user_data;
+    if (!gt) return;
     GdkEvent *event = gtk_event_controller_get_current_event(GTK_EVENT_CONTROLLER(gesture));
-    GdkModifierType state = gdk_event_get_modifier_state(event);
+    GdkModifierType state = 0;
+    if (event)
+        state = gdk_event_get_modifier_state(event);
     guint button = gtk_gesture_single_get_current_button(GTK_GESTURE_SINGLE(gesture));
 
     if (!(state & GDK_CONTROL_MASK))
@@ -382,7 +410,8 @@ static void gterm_click_pressed_cb(GtkGestureClick *gesture,
 static void gterm_window_destroy(GtkWidget *widget, gpointer data)
 {
     gterm *gt = data;
-    g_application_quit(G_APPLICATION(gt->app));
+    if (gt && gt->app)
+        g_application_quit(G_APPLICATION(gt->app));
 }
 
 static void gterm_window_configure(gterm *gt)
@@ -391,10 +420,14 @@ static void gterm_window_configure(gterm *gt)
     char *str;
 
     str = gcfg_get(gt->cfg, GTERM_CFG_KEY_TITLE);
-    if (str) {
-        gtk_window_set_title(GTK_WINDOW(gt->window), str);
-        g_free(str);
+    if (str && *str) {
+        char *valid_str = g_utf8_make_valid(str, -1);
+        if (valid_str) {
+            gtk_window_set_title(GTK_WINDOW(gt->window), valid_str);
+            g_free(valid_str);
+        }
     }
+    g_free(str);
 
     b = gcfg_get_bool(gt->cfg, GTERM_CFG_KEY_FULLSCREEN);
     if (b == GCFG_BOOL_TRUE) {
@@ -405,14 +438,17 @@ static void gterm_window_configure(gterm *gt)
     }
 }
 
-static gterm *gterm_new(GtkApplication *app, GKeyFile *cfg)
+static void gterm_app_activate(GApplication *app, gpointer user_data)
 {
-    gterm *gt = g_new0(gterm, 1);
+    gterm *gt = user_data;
 
-    gt->app = app;
-    gt->cfg = cfg;
+    if (gt->window) {
+        gtk_window_present(GTK_WINDOW(gt->window));
+        return;
+    }
 
-    gt->window = gtk_application_window_new(app);
+    gt->window = gtk_application_window_new(GTK_APPLICATION(app));
+    gtk_window_set_title(GTK_WINDOW(gt->window), "gterm");
     g_signal_connect(G_OBJECT(gt->window), "destroy",
                      G_CALLBACK(gterm_window_destroy), gt);
 
@@ -433,14 +469,22 @@ static gterm *gterm_new(GtkApplication *app, GKeyFile *cfg)
     gterm_window_configure(gt);
     gterm_vte_configure(gt);
 
+    if (gt->eopt) {
+        char *title = gcfg_get(gt->cfg, GTERM_CFG_KEY_TITLE);
+        if (!title && gt->eopt < gt->argc && gt->argv[gt->eopt]) {
+             char *valid_str = g_utf8_make_valid(gt->argv[gt->eopt], -1);
+             if (valid_str) {
+                 gtk_window_set_title(GTK_WINDOW(gt->window), valid_str);
+                 g_free(valid_str);
+             }
+        }
+        g_free(title);
+        gterm_spawn(gt, gt->argv + gt->eopt);
+    } else {
+        gterm_spawn_shell(gt);
+    }
+
     gtk_window_present(GTK_WINDOW(gt->window));
-
-    return gt;
-}
-
-static void gterm_app_activate(GApplication *app, gpointer user_data)
-{
-    // Do nothing, we handle everything in main for now to keep the logic similar
 }
 
 int main(int argc, char *argv[])
@@ -449,18 +493,23 @@ int main(int argc, char *argv[])
     GKeyFile *cfg;
     gterm *gt;
     const gcfg_opt *opt;
-    int i, eopt = 0;
+    int i;
 
-    gtk_init();
+    gt = g_new0(gterm, 1);
+    gt->argc = argc;
+    gt->argv = g_strdupv(argv);
 
     cfg = g_key_file_new();
     filename = g_strdup_printf("%s/%s", g_get_home_dir(), GTERM_CFG_FILENAME);
-    g_key_file_load_from_file(cfg, filename, G_KEY_FILE_NONE, NULL);
-    g_free(filename);
+    if (filename) {
+        g_key_file_load_from_file(cfg, filename, G_KEY_FILE_NONE, NULL);
+        g_free(filename);
+    }
+    gt->cfg = cfg;
 
     for (i = 1; i < argc;) {
         if (strcmp(argv[i], "-e") == 0) {
-            eopt = i + 1;
+            gt->eopt = i + 1;
             break;
         }
         opt = gcfg_opt_find(gterm_opts, ARRAY_SIZE(gterm_opts), argv[i]);
@@ -484,34 +533,21 @@ int main(int argc, char *argv[])
         }
     }
 
-    GtkApplication *app = gtk_application_new("org.gterm.terminal", G_APPLICATION_DEFAULT_FLAGS);
-    g_signal_connect(app, "activate", G_CALLBACK(gterm_app_activate), NULL);
+    gt->app = gtk_application_new("org.gterm.terminal", G_APPLICATION_DEFAULT_FLAGS);
+    g_signal_connect(gt->app, "activate", G_CALLBACK(gterm_app_activate), gt);
 
-    // We need to run g_application_register to use it without g_application_run if we want to stay close to original flow,
-    // but GTK 4 really wants g_application_run.
-    // Let's use a hybrid approach or just put everything in activate.
-    // Actually, gterm_new creates the window.
-
-    g_application_register(G_APPLICATION(app), NULL, NULL);
-
-    gt = gterm_new(app, cfg);
-    if (eopt) {
-        char *title = gcfg_get(cfg, GTERM_CFG_KEY_TITLE);
-        if (!title && argv[eopt])
-            gtk_window_set_title(GTK_WINDOW(gt->window), argv[eopt]);
-        g_free(title);
-        gterm_spawn(gt, argv + eopt);
-    } else {
-        gterm_spawn_shell(gt);
-    }
-
-    while (g_list_length(gtk_application_get_windows(app)) > 0) {
-        g_main_context_iteration(NULL, TRUE);
-    }
+    int status = g_application_run(G_APPLICATION(gt->app), 0, NULL);
 
     int exit_code = gt->exit_code;
+    if (status != 0 && exit_code == 0)
+        exit_code = status;
+
+    if (gt->app)
+        g_object_unref(gt->app);
+    if (gt->cfg)
+        g_key_file_free(gt->cfg);
+    if (gt->argv)
+        g_strfreev(gt->argv);
     g_free(gt);
-    g_object_unref(app);
-    g_key_file_free(cfg);
     return exit_code;
 }
