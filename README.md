@@ -1,6 +1,6 @@
 # gterm
 
-Terminal application, based on gtk3 and vte.  The plan is to have a
+Terminal application, based on gtk4 and vte.  The plan is to have a
 modern terminal (which can -- for example -- run on wayland and render
 emoji) for xterm fans.
 

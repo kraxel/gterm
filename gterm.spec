@@ -8,11 +8,11 @@ Source:       %{name}-%{version}.tar.gz
 BuildRequires: gcc binutils
 BuildRequires: meson ninja-build
 BuildRequires: pkgconfig(glib-2.0)
-BuildRequires: pkgconfig(gtk+-3.0)
-BuildRequires: pkgconfig(vte-2.91)
+BuildRequires: pkgconfig(gtk4)
+BuildRequires: pkgconfig(vte-2.91-gtk4)
 
 %description
-Terminal application, based on gtk3 and vte.  The plan
+Terminal application, based on gtk4 and vte.  The plan
 is to have a modern terminal for xterm fans.
 
 %prep
