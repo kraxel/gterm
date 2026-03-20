@@ -140,16 +140,14 @@ static void gload_draw(GtkDrawingArea *drawing_area,
 {
     gload *gl = user_data;
     GdkRGBA normal, dimmed;
-    const char *highlight, *alpha;
+    char *highlight, *alpha;
     guint i, idx, max;
 
     highlight = gcfg_get(gl->cfg, GLOAD_CFG_KEY_HIGHLIGHT);
     if (highlight) {
         gdk_rgba_parse(&normal, highlight);
+        g_free(highlight);
     } else {
-        // Fallback color if no highlight is set.
-        // In GTK4 we can't easily get the theme color from context without a state.
-        // Let's use black or some default.
         normal.red = 0; normal.green = 0; normal.blue = 0; normal.alpha = 1.0;
     }
     normal.alpha = 1.0;
@@ -158,6 +156,7 @@ static void gload_draw(GtkDrawingArea *drawing_area,
     alpha = gcfg_get(gl->cfg, GLOAD_CFG_KEY_ALPHA);
     if (alpha) {
         dimmed.alpha = atoi(alpha) / 100.0;
+        g_free(alpha);
     } else {
         dimmed.alpha = 0.6;
     }
@@ -175,14 +174,14 @@ static void gload_draw(GtkDrawingArea *drawing_area,
     gdk_cairo_set_source_rgba(cr, &dimmed);
     for (i = 0; i < gl->used && i < (guint)width; i++) {
         idx = gl->used > (guint)width ? i + gl->used - width : i;
-        cairo_move_to(cr, i - 0.5, (max - gl->load1[idx]) * height / max - 0.5);
+        cairo_move_to(cr, i - 0.5, (max - gl->load1[idx]) * (double)height / max - 0.5);
         cairo_line_to(cr, i - 0.5, height - 0.5);
     }
     cairo_stroke(cr);
 
     gdk_cairo_set_source_rgba(cr, &normal);
     for (i = 100; i < max; i += 100) {
-        int y = (max - i) * height / max;
+        double y = (max - i) * (double)height / max;
         cairo_move_to(cr, 0, y - 0.5);
         cairo_line_to(cr, width, y - 0.5);
     }
@@ -202,7 +201,7 @@ static gload *gload_new(GtkApplication *app, GKeyFile *cfg)
     struct utsname uts;
     GtkWidget *vbox;
     gload *gl = g_new0(gload, 1);
-    const char *label, *fontname, *highlight;
+    char *label, *fontname, *highlight;
     char *markup;
 
     gl->app = app;
@@ -218,7 +217,7 @@ static gload *gload_new(GtkApplication *app, GKeyFile *cfg)
     label = gcfg_get(gl->cfg, GLOAD_CFG_KEY_LABEL);
     if (!label) {
         uname(&uts);
-        label = uts.nodename;
+        label = g_strdup(uts.nodename);
     }
     gl->label = gtk_label_new(label);
     gtk_label_set_xalign(GTK_LABEL(gl->label), 0);
@@ -236,6 +235,9 @@ static gload *gload_new(GtkApplication *app, GKeyFile *cfg)
                              label);
     gtk_label_set_markup(GTK_LABEL(gl->label), markup);
     g_free(markup);
+    g_free(label);
+    g_free(fontname);
+    g_free(highlight);
 
     gl->graph = gtk_drawing_area_new();
     gtk_widget_set_size_request(gl->graph, 200, 100);
@@ -257,13 +259,13 @@ int main(int argc, char *argv[])
     GKeyFile *cfg;
     gload *gl;
     const gcfg_opt *opt;
-    const char *valstr;
+    char *valstr;
     int i, value;
 
     gtk_init();
 
     cfg = g_key_file_new();
-    filename = g_strdup_printf("%s/%s", getenv("HOME"), GLOAD_CFG_FILENAME);
+    filename = g_strdup_printf("%s/%s", g_get_home_dir(), GLOAD_CFG_FILENAME);
     g_key_file_load_from_file(cfg, filename, G_KEY_FILE_NONE, NULL);
     g_free(filename);
 
@@ -296,12 +298,16 @@ int main(int argc, char *argv[])
 
     valstr = gcfg_get(gl->cfg, GLOAD_CFG_KEY_UPDATE);
     value = valstr ? atoi(valstr) : 10;
+    g_free(valstr);
     g_timeout_add_seconds(value, gload_timer, gl);
 
     while (g_list_length(gtk_application_get_windows(app)) > 0) {
         g_main_context_iteration(NULL, TRUE);
     }
 
+    free(gl->load1);
+    g_free(gl);
     g_object_unref(app);
+    g_key_file_free(cfg);
     return 0;
 }

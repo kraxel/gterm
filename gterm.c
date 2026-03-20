@@ -70,10 +70,16 @@ typedef struct gterm {
     gint exit_code;
 } gterm;
 
+typedef struct gterm_spawn_data {
+    gterm *gt;
+    char **argv;
+} gterm_spawn_data;
+
 static void gterm_spawn_cb(VteTerminal *terminal, GPid pid,
                            GError *error, gpointer user_data)
 {
-    gterm *gt = user_data;
+    gterm_spawn_data *sd = user_data;
+    gterm *gt = sd->gt;
 
     if (error) {
         fprintf(stderr, "ERROR: %s\n", error->message);
@@ -82,14 +88,20 @@ static void gterm_spawn_cb(VteTerminal *terminal, GPid pid,
     } else {
         gt->pid = pid;
     }
+    g_strfreev(sd->argv);
+    g_free(sd);
 }
 
 static void gterm_spawn(gterm *gt, char *argv[])
 {
+    gterm_spawn_data *sd = g_new0(gterm_spawn_data, 1);
+    sd->gt = gt;
+    sd->argv = g_strdupv(argv);
+
     vte_terminal_spawn_async(VTE_TERMINAL(gt->terminal),
                              VTE_PTY_DEFAULT,
                              NULL,
-                             argv,
+                             sd->argv,
                              NULL,
                              G_SPAWN_SEARCH_PATH,
                              NULL,
@@ -98,7 +110,7 @@ static void gterm_spawn(gterm *gt, char *argv[])
                              -1,
                              NULL,
                              gterm_spawn_cb,
-                             gt);
+                             sd);
 }
 
 static void gterm_spawn_shell(gterm *gt)
@@ -116,10 +128,9 @@ static void gterm_spawn_shell(gterm *gt)
     if (!shell)
         shell = "/bin/sh";
 
-    argv[0] = strdup(shell);
+    argv[0] = (char*)shell;
     argv[1] = NULL;
     gterm_spawn(gt, argv);
-    free(argv[0]);
 }
 
 static void gterm_vte_child_exited(VteTerminal *vteterminal,
@@ -142,7 +153,9 @@ static void gterm_vte_window_title_changed(VteTerminal *vteterminal,
     const char *str;
 
     str = vte_terminal_get_window_title(VTE_TERMINAL(gt->terminal));
-    gtk_window_set_title(GTK_WINDOW(gt->window), str);
+    if (str) {
+        gtk_window_set_title(GTK_WINDOW(gt->window), str);
+    }
 }
 
 static void gterm_vte_configure(gterm *gt)
@@ -174,10 +187,15 @@ static void gterm_vte_configure(gterm *gt)
         pango_font_description_free(font);
         g_free(fontdesc);
     }
+    g_free(fontname);
+    g_free(fontsize);
 
     str = gcfg_get(gt->cfg, GTERM_CFG_KEY_GEOMETRY);
-    if (str && sscanf(str, "%dx%d", &cols, &rows) == 2) {
-        vte_terminal_set_size(VTE_TERMINAL(gt->terminal), cols, rows);
+    if (str) {
+        if (sscanf(str, "%dx%d", &cols, &rows) == 2) {
+            vte_terminal_set_size(VTE_TERMINAL(gt->terminal), cols, rows);
+        }
+        g_free(str);
     }
 
     b = gcfg_get_bool(gt->cfg, GTERM_CFG_KEY_CURSOR_BLINK);
@@ -208,21 +226,25 @@ static void gterm_vte_configure(gterm *gt)
     if (str) {
         if (gdk_rgba_parse(&color, str))
             vte_terminal_set_color_cursor(VTE_TERMINAL(gt->terminal), &color);
+        g_free(str);
     }
     str = gcfg_get(gt->cfg, GTERM_CFG_KEY_FOREGROUND);
     if (str) {
         if (gdk_rgba_parse(&color, str))
             vte_terminal_set_color_foreground(VTE_TERMINAL(gt->terminal), &color);
+        g_free(str);
     }
     str = gcfg_get(gt->cfg, GTERM_CFG_KEY_BACKGROUND);
     if (str) {
         if (gdk_rgba_parse(&color, str))
             vte_terminal_set_color_background(VTE_TERMINAL(gt->terminal), &color);
+        g_free(str);
     }
     str = gcfg_get(gt->cfg, GTERM_CFG_KEY_SCROLLBACK_LINES);
     if (str) {
         vte_terminal_set_scrollback_lines(VTE_TERMINAL(gt->terminal),
                                           atoi(str));
+        g_free(str);
     }
 }
 
@@ -311,7 +333,7 @@ static void gterm_fill_menu(gterm *gt)
     GMenu *font_menu = g_menu_new();
     fontname = gcfg_get(gt->cfg, GTERM_CFG_KEY_FONT_FACE);
     if (!fontname)
-        fontname = "monospace";
+        fontname = g_strdup("monospace");
     for (i = 0; i < (int)ARRAY_SIZE(sizes); i++) {
         fontsize = gcfg_get(gt->cfg, sizes[i]);
         if (!fontsize)
@@ -322,7 +344,9 @@ static void gterm_fill_menu(gterm *gt)
         g_menu_append_item(font_menu, item);
         g_object_unref(item);
         g_free(fontdesc);
+        g_free(fontsize);
     }
+    g_free(fontname);
     g_menu_append_section(gt->menu, NULL, G_MENU_MODEL(font_menu));
     g_object_unref(font_menu);
 
@@ -369,6 +393,7 @@ static void gterm_window_configure(gterm *gt)
     str = gcfg_get(gt->cfg, GTERM_CFG_KEY_TITLE);
     if (str) {
         gtk_window_set_title(GTK_WINDOW(gt->window), str);
+        g_free(str);
     }
 
     b = gcfg_get_bool(gt->cfg, GTERM_CFG_KEY_FULLSCREEN);
@@ -429,7 +454,7 @@ int main(int argc, char *argv[])
     gtk_init();
 
     cfg = g_key_file_new();
-    filename = g_strdup_printf("%s/%s", getenv("HOME"), GTERM_CFG_FILENAME);
+    filename = g_strdup_printf("%s/%s", g_get_home_dir(), GTERM_CFG_FILENAME);
     g_key_file_load_from_file(cfg, filename, G_KEY_FILE_NONE, NULL);
     g_free(filename);
 
@@ -471,8 +496,10 @@ int main(int argc, char *argv[])
 
     gt = gterm_new(app, cfg);
     if (eopt) {
-        if (!gcfg_get(cfg, GTERM_CFG_KEY_TITLE))
+        char *title = gcfg_get(cfg, GTERM_CFG_KEY_TITLE);
+        if (!title && argv[eopt])
             gtk_window_set_title(GTK_WINDOW(gt->window), argv[eopt]);
+        g_free(title);
         gterm_spawn(gt, argv + eopt);
     } else {
         gterm_spawn_shell(gt);
@@ -485,5 +512,6 @@ int main(int argc, char *argv[])
     int exit_code = gt->exit_code;
     g_free(gt);
     g_object_unref(app);
+    g_key_file_free(cfg);
     return exit_code;
 }
