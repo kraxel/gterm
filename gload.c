@@ -39,6 +39,7 @@ static const gcfg_opt gload_opts[] = {
 /* ------------------------------------------------------------------------ */
 
 typedef struct gload {
+    GtkApplication *app;
     GtkWidget *window;
     GtkWidget *label;
     GtkWidget *graph;
@@ -55,12 +56,14 @@ static void gload_resize(gload *gl, uint32_t size)
 {
     int *ptr;
 
-    if (size < gl->total)
+    if (size <= gl->total)
         return;
 
     ptr = calloc(size, sizeof(int));
-    memcpy(ptr, gl->load1, gl->total * sizeof(int));
-    free(gl->load1);
+    if (gl->load1) {
+        memcpy(ptr, gl->load1, gl->total * sizeof(int));
+        free(gl->load1);
+    }
     gl->load1 = ptr;
     gl->total = size;
 }
@@ -129,23 +132,25 @@ static gboolean gload_timer(gpointer user_data)
 
 /* ------------------------------------------------------------------------ */
 
-static gboolean gload_draw(GtkWidget *widget, cairo_t *cr, gpointer data)
+static void gload_draw(GtkDrawingArea *drawing_area,
+                       cairo_t        *cr,
+                       int             width,
+                       int             height,
+                       gpointer        user_data)
 {
-    gload *gl = data;
-    GtkStyleContext *context;
+    gload *gl = user_data;
     GdkRGBA normal, dimmed;
     const char *highlight, *alpha;
-    guint width, height, i, idx, max;
-
-    context = gtk_widget_get_style_context(widget);
-    width = gtk_widget_get_allocated_width(widget);
-    height = gtk_widget_get_allocated_height(widget);
+    guint i, idx, max;
 
     highlight = gcfg_get(gl->cfg, GLOAD_CFG_KEY_HIGHLIGHT);
     if (highlight) {
         gdk_rgba_parse(&normal, highlight);
     } else {
-        gtk_style_context_get_color(context, GTK_STATE_FLAG_NORMAL, &normal);
+        // Fallback color if no highlight is set.
+        // In GTK4 we can't easily get the theme color from context without a state.
+        // Let's use black or some default.
+        normal.red = 0; normal.green = 0; normal.blue = 0; normal.alpha = 1.0;
     }
     normal.alpha = 1.0;
 
@@ -158,9 +163,9 @@ static gboolean gload_draw(GtkWidget *widget, cairo_t *cr, gpointer data)
     }
 
     gload_resize(gl, width);
-    for (i = 0, max = 0; i < gl->used && i < width; i++) {
-        idx = gl->used > width ? i + gl->used - width : i;
-        if (max < gl->load1[idx])
+    for (i = 0, max = 0; i < gl->used && i < (guint)width; i++) {
+        idx = gl->used > (guint)width ? i + gl->used - width : i;
+        if (max < (guint)gl->load1[idx])
             max = gl->load1[idx];
     }
     max += 100;
@@ -168,8 +173,8 @@ static gboolean gload_draw(GtkWidget *widget, cairo_t *cr, gpointer data)
 
     cairo_set_line_width(cr, 1);
     gdk_cairo_set_source_rgba(cr, &dimmed);
-    for (i = 0; i < gl->used && i < width; i++) {
-        idx = gl->used > width ? i + gl->used - width : i;
+    for (i = 0; i < gl->used && i < (guint)width; i++) {
+        idx = gl->used > (guint)width ? i + gl->used - width : i;
         cairo_move_to(cr, i - 0.5, (max - gl->load1[idx]) * height / max - 0.5);
         cairo_line_to(cr, i - 0.5, height - 0.5);
     }
@@ -182,18 +187,17 @@ static gboolean gload_draw(GtkWidget *widget, cairo_t *cr, gpointer data)
         cairo_line_to(cr, width, y - 0.5);
     }
     cairo_stroke(cr);
-
-    return FALSE;
 }
 
 /* ------------------------------------------------------------------------ */
 
 static void gload_window_destroy(GtkWidget *widget, gpointer data)
 {
-    gtk_main_quit();
+    gload *gl = data;
+    g_application_quit(G_APPLICATION(gl->app));
 }
 
-static gload *gload_new(GKeyFile *cfg)
+static gload *gload_new(GtkApplication *app, GKeyFile *cfg)
 {
     struct utsname uts;
     GtkWidget *vbox;
@@ -201,14 +205,15 @@ static gload *gload_new(GKeyFile *cfg)
     const char *label, *fontname, *highlight;
     char *markup;
 
+    gl->app = app;
     gl->cfg = cfg;
 
-    gl->window = gtk_window_new(GTK_WINDOW_TOPLEVEL);
+    gl->window = gtk_application_window_new(app);
     g_signal_connect(G_OBJECT(gl->window), "destroy",
                      G_CALLBACK(gload_window_destroy), gl);
 
     vbox = gtk_box_new(GTK_ORIENTATION_VERTICAL, 0);
-    gtk_container_add(GTK_CONTAINER(gl->window), vbox);
+    gtk_window_set_child(GTK_WINDOW(gl->window), vbox);
 
     label = gcfg_get(gl->cfg, GLOAD_CFG_KEY_LABEL);
     if (!label) {
@@ -217,7 +222,7 @@ static gload *gload_new(GKeyFile *cfg)
     }
     gl->label = gtk_label_new(label);
     gtk_label_set_xalign(GTK_LABEL(gl->label), 0);
-    gtk_box_pack_start(GTK_BOX(vbox), gl->label, false, false, 0);
+    gtk_box_append(GTK_BOX(vbox), gl->label);
 
     fontname = gcfg_get(gl->cfg, GLOAD_CFG_KEY_FONTNAME);
     highlight = gcfg_get(gl->cfg, GLOAD_CFG_KEY_HIGHLIGHT);
@@ -234,12 +239,16 @@ static gload *gload_new(GKeyFile *cfg)
 
     gl->graph = gtk_drawing_area_new();
     gtk_widget_set_size_request(gl->graph, 200, 100);
-    g_signal_connect(G_OBJECT(gl->graph), "draw",
-                     G_CALLBACK(gload_draw), gl);
-    gtk_box_pack_start(GTK_BOX(vbox), gl->graph, true, true, 0);
+    gtk_drawing_area_set_draw_func(GTK_DRAWING_AREA(gl->graph), gload_draw, gl, NULL);
+    gtk_box_append(GTK_BOX(vbox), gl->graph);
+    gtk_widget_set_vexpand(gl->graph, TRUE);
 
-    gtk_widget_show_all(gl->window);
+    gtk_window_present(GTK_WINDOW(gl->window));
     return gl;
+}
+
+static void gload_app_activate(GApplication *app, gpointer user_data)
+{
 }
 
 int main(int argc, char *argv[])
@@ -251,7 +260,7 @@ int main(int argc, char *argv[])
     const char *valstr;
     int i, value;
 
-    gtk_init(&argc, &argv);
+    gtk_init();
 
     cfg = g_key_file_new();
     filename = g_strdup_printf("%s/%s", getenv("HOME"), GLOAD_CFG_FILENAME);
@@ -278,13 +287,21 @@ int main(int argc, char *argv[])
         }
     }
 
-    gl = gload_new(cfg);
+    GtkApplication *app = gtk_application_new("org.gterm.load", G_APPLICATION_DEFAULT_FLAGS);
+    g_signal_connect(app, "activate", G_CALLBACK(gload_app_activate), NULL);
+    g_application_register(G_APPLICATION(app), NULL, NULL);
+
+    gl = gload_new(app, cfg);
     gload_read(gl);
 
     valstr = gcfg_get(gl->cfg, GLOAD_CFG_KEY_UPDATE);
     value = valstr ? atoi(valstr) : 10;
     g_timeout_add_seconds(value, gload_timer, gl);
 
-    gtk_main();
+    while (g_list_length(gtk_application_get_windows(app)) > 0) {
+        g_main_context_iteration(NULL, TRUE);
+    }
+
+    g_object_unref(app);
     return 0;
 }
