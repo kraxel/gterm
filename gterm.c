@@ -104,12 +104,22 @@ static void gterm_spawn(gterm *gt, char *argv[])
 static void gterm_spawn_shell(gterm *gt)
 {
     struct passwd *pwent;
+    const char *shell;
     char *argv[2];
 
-    pwent = getpwuid(getuid());
-    argv[0] = strdup(pwent->pw_shell);
+    shell = getenv("SHELL");
+    if (!shell) {
+        pwent = getpwuid(getuid());
+        if (pwent)
+            shell = pwent->pw_shell;
+    }
+    if (!shell)
+        shell = "/bin/sh";
+
+    argv[0] = strdup(shell);
     argv[1] = NULL;
     gterm_spawn(gt, argv);
+    free(argv[0]);
 }
 
 static void gterm_vte_child_exited(VteTerminal *vteterminal,
@@ -473,6 +483,7 @@ int main(int argc, char *argv[])
     }
 
     int exit_code = gt->exit_code;
+    g_free(gt);
     g_object_unref(app);
     return exit_code;
 }
