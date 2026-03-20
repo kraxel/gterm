@@ -296,7 +296,7 @@ int main(int argc, char *argv[])
         }
     }
 
-    gl->app = gtk_application_new("org.gterm.load", G_APPLICATION_DEFAULT_FLAGS);
+    gl->app = gtk_application_new("org.gterm.load", G_APPLICATION_NON_UNIQUE);
     g_signal_connect(gl->app, "activate", G_CALLBACK(gload_app_activate), gl);
 
     gload_read(gl);

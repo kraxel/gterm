@@ -533,7 +533,7 @@ int main(int argc, char *argv[])
         }
     }
 
-    gt->app = gtk_application_new("org.gterm.terminal", G_APPLICATION_DEFAULT_FLAGS);
+    gt->app = gtk_application_new("org.gterm.terminal", G_APPLICATION_NON_UNIQUE);
     g_signal_connect(gt->app, "activate", G_CALLBACK(gterm_app_activate), gt);
 
     int status = g_application_run(G_APPLICATION(gt->app), 0, NULL);
