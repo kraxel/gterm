@@ -151,25 +151,36 @@ static void gterm_vte_window_title_changed(VteTerminal *vteterminal,
 }
 #endif
 
-static gboolean gterm_vte_button_press_event(GtkWidget *widget,
-                                             GdkEvent  *event,
-                                             gpointer   user_data)
+static void gterm_vte_gesture_pressed(GtkGestureMultiPress *gesture,
+                                      gint                  n_press,
+                                      gdouble               x,
+                                      gdouble               y,
+                                      gpointer              user_data)
 {
-    GdkEventButton *btn = (GdkEventButton *)event;
     gterm *gt = user_data;
+    GdkModifierType state;
+    guint button;
+    GdkEventSequence *sequence;
+    const GdkEvent *event;
 
-    if (btn->type != GDK_BUTTON_PRESS)
-        return FALSE;
-    if (!(btn->state & GDK_CONTROL_MASK))
-        return FALSE;
+    if (n_press > 1)
+        return;
 
-    if (!(btn->button == 1 ||
-          btn->button == 2 ||
-          btn->button == 3))
-        return FALSE;
+    sequence = gtk_gesture_get_last_updated_sequence(GTK_GESTURE(gesture));
+    event = gtk_gesture_get_last_event(GTK_GESTURE(gesture), sequence);
 
+    if (!event || !gdk_event_get_state(event, &state))
+        return;
+
+    if (!(state & GDK_CONTROL_MASK))
+        return;
+
+    button = gtk_gesture_single_get_current_button(GTK_GESTURE_SINGLE(gesture));
+    if (button < 1 || button > 3)
+        return;
+
+    gtk_gesture_set_state(GTK_GESTURE(gesture), GTK_EVENT_SEQUENCE_CLAIMED);
     gtk_menu_popup_at_pointer(GTK_MENU(gt->popup), event);
-    return TRUE;
 }
 
 static void gterm_vte_configure(gterm *gt)
@@ -425,8 +436,12 @@ static void gterm_new(gterm *gt)
     g_signal_connect(G_OBJECT(gt->terminal), "window-title-changed",
                      G_CALLBACK(gterm_vte_window_title_changed), gt);
 #endif
-    g_signal_connect(G_OBJECT(gt->terminal), "button-press-event",
-                     G_CALLBACK(gterm_vte_button_press_event), gt);
+    GtkGesture *gesture = gtk_gesture_multi_press_new(gt->terminal);
+    gtk_event_controller_set_propagation_phase(GTK_EVENT_CONTROLLER(gesture),
+                                               GTK_PHASE_TARGET);
+    gtk_gesture_single_set_button(GTK_GESTURE_SINGLE(gesture), 0);
+    g_signal_connect(gesture, "pressed",
+                     G_CALLBACK(gterm_vte_gesture_pressed), gt);
     gtk_container_add(GTK_CONTAINER(gt->window), gt->terminal);
 
     gt->popup = gtk_menu_new();
