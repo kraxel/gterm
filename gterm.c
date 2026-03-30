@@ -88,7 +88,6 @@ static void gterm_spawn_cb(VteTerminal *terminal, GPid pid,
 
 static void gterm_spawn(gterm *gt, char *argv[])
 {
-#if VTE_CHECK_VERSION(0,48,0)
     vte_terminal_spawn_async(VTE_TERMINAL(gt->terminal),
                              VTE_PTY_DEFAULT,
                              NULL,
@@ -102,23 +101,6 @@ static void gterm_spawn(gterm *gt, char *argv[])
                              NULL,
                              gterm_spawn_cb,
                              gt);
-#else
-    GError *error = NULL;
-    GPid pid = -1;
-
-    vte_terminal_spawn_sync(VTE_TERMINAL(gt->terminal),
-                            VTE_PTY_DEFAULT,
-                            NULL,
-                            argv,
-                            NULL,
-                            G_SPAWN_SEARCH_PATH,
-                            NULL,
-                            NULL,
-                            &pid,
-                            NULL,
-                            &error);
-    gterm_spawn_cb(VTE_TERMINAL(gt->terminal), pid, error, gt);
-#endif
 }
 
 static void gterm_spawn_shell(gterm *gt)
@@ -172,14 +154,7 @@ static gboolean gterm_vte_button_press_event(GtkWidget *widget,
           btn->button == 3))
         return FALSE;
 
-#if GTK_CHECK_VERSION(3,22,0)
     gtk_menu_popup_at_pointer(GTK_MENU(gt->popup), event);
-#else
-    gtk_menu_popup(GTK_MENU(gt->popup),
-                   NULL, NULL, NULL, NULL,
-                   btn->button,
-                   gtk_get_current_event_time());
-#endif
     return TRUE;
 }
 
