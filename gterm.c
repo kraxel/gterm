@@ -131,10 +131,13 @@ static void gterm_vte_window_title_changed(VteTerminal *vteterminal,
                                            gpointer     user_data)
 {
     gterm *gt = user_data;
-    const char *str;
+    char *str;
 
-    str = vte_terminal_get_window_title(VTE_TERMINAL(gt->terminal));
-    gtk_window_set_title(GTK_WINDOW(gt->window), str);
+    g_object_get(G_OBJECT(vteterminal), "window-title", &str, NULL);
+    if (str) {
+        gtk_window_set_title(GTK_WINDOW(gt->window), str);
+        g_free(str);
+    }
 }
 
 static gboolean gterm_vte_button_press_event(GtkWidget *widget,
