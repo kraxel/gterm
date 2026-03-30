@@ -56,6 +56,8 @@ static const gcfg_opt gterm_opts[] = {
 /* ------------------------------------------------------------------------ */
 
 typedef struct gterm {
+    GtkApplication *app;
+
     GtkWidget *window;
     GtkWidget *terminal;
     GtkWidget *popup;
@@ -65,6 +67,7 @@ typedef struct gterm {
     GSList *fontgrp;
 
     GKeyFile *cfg;
+    char **exec;
     GPid pid;
     gint exit_code;
 } gterm;
@@ -77,7 +80,7 @@ static void gterm_spawn_cb(VteTerminal *terminal, GPid pid,
     if (error) {
         fprintf(stderr, "ERROR: %s\n", error->message);
         gt->exit_code = 1;
-        gtk_main_quit();
+        g_application_quit(G_APPLICATION(gt->app));
     } else {
         gt->pid = pid;
     }
@@ -139,7 +142,7 @@ static void gterm_vte_child_exited(VteTerminal *vteterminal,
         gt->exit_code = WEXITSTATUS(status);
     if (WIFSIGNALED(status))
         gt->exit_code = 1;
-    gtk_main_quit();
+    g_application_quit(G_APPLICATION(gt->app));
 }
 
 static void gterm_vte_window_title_changed(VteTerminal *vteterminal,
@@ -396,7 +399,9 @@ static void gterm_fill_menu(gterm *gt)
 
 static void gterm_window_destroy(GtkWidget *widget, gpointer data)
 {
-    gtk_main_quit();
+    gterm *gt = data;
+
+    g_application_quit(G_APPLICATION(gt->app));
 }
 
 static void gterm_window_configure(gterm *gt)
@@ -415,13 +420,9 @@ static void gterm_window_configure(gterm *gt)
     }
 }
 
-static gterm *gterm_new(GKeyFile *cfg)
+static void gterm_new(gterm *gt)
 {
-    gterm *gt = g_new0(gterm, 1);
-
-    gt->cfg = cfg;
-
-    gt->window = gtk_window_new(GTK_WINDOW_TOPLEVEL);
+    gt->window = gtk_application_window_new(gt->app);
     g_signal_connect(G_OBJECT(gt->window), "destroy",
                      G_CALLBACK(gterm_window_destroy), gt);
 
@@ -441,8 +442,21 @@ static gterm *gterm_new(GKeyFile *cfg)
     gterm_vte_configure(gt);
     gterm_vte_geometry_hints(gt);
     gtk_widget_show_all(gt->window);
+}
 
-    return gt;
+static void gterm_activate(GApplication *app, gpointer data)
+{
+    gterm *gt = data;
+
+    gterm_new(gt);
+
+    if (gt->exec) {
+        if (!gcfg_get(gt->cfg, GTERM_CFG_KEY_TITLE))
+            gtk_window_set_title(GTK_WINDOW(gt->window), gt->exec[0]);
+        gterm_spawn(gt, gt->exec);
+    } else {
+        gterm_spawn_shell(gt);
+    }
 }
 
 int main(int argc, char *argv[])
@@ -452,8 +466,6 @@ int main(int argc, char *argv[])
     gterm *gt;
     const gcfg_opt *opt;
     int i, eopt = 0;
-
-    gtk_init(&argc, &argv);
 
     cfg = g_key_file_new();
     filename = g_strdup_printf("%s/%s", getenv("HOME"), GTERM_CFG_FILENAME);
@@ -486,15 +498,14 @@ int main(int argc, char *argv[])
         }
     }
 
-    gt = gterm_new(cfg);
+    gt = g_new0(gterm, 1);
+    gt->cfg = cfg;
     if (eopt) {
-        if (!gcfg_get(cfg, GTERM_CFG_KEY_TITLE))
-            gtk_window_set_title(GTK_WINDOW(gt->window), argv[eopt]);
-        gterm_spawn(gt, argv + eopt);
-    } else {
-        gterm_spawn_shell(gt);
+        gt->exec = argv + eopt;
     }
+    gt->app = gtk_application_new("org.kraxel.gterm", G_APPLICATION_NON_UNIQUE);
+    g_signal_connect(gt->app, "activate", G_CALLBACK(gterm_activate), gt);
 
-    gtk_main();
+    g_application_run(G_APPLICATION(gt->app), 0, NULL);
     return gt->exit_code;
 }
