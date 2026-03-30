@@ -108,7 +108,7 @@ static void gterm_spawn_shell(gterm *gt)
     struct passwd *pwent;
     char *argv[2];
 
-    pwent = getpwent();
+    pwent = getpwuid(getuid());
     argv[0] = strdup(pwent->pw_shell);
     argv[1] = NULL;
     gterm_spawn(gt, argv);
