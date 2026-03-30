@@ -193,15 +193,12 @@ static void gload_window_destroy(GtkWidget *widget, gpointer data)
     gtk_main_quit();
 }
 
-static gload *gload_new(GKeyFile *cfg)
+static void gload_new(gload *gl)
 {
     struct utsname uts;
     GtkWidget *vbox;
-    gload *gl = g_new0(gload, 1);
     const char *label, *fontname, *highlight;
     char *markup;
-
-    gl->cfg = cfg;
 
     gl->window = gtk_window_new(GTK_WINDOW_TOPLEVEL);
     g_signal_connect(G_OBJECT(gl->window), "destroy",
@@ -239,7 +236,6 @@ static gload *gload_new(GKeyFile *cfg)
     gtk_box_pack_start(GTK_BOX(vbox), gl->graph, true, true, 0);
 
     gtk_widget_show_all(gl->window);
-    return gl;
 }
 
 int main(int argc, char *argv[])
@@ -278,7 +274,10 @@ int main(int argc, char *argv[])
         }
     }
 
-    gl = gload_new(cfg);
+    gl = g_new0(gload, 1);
+    gl->cfg = cfg;
+
+    gload_new(gl);
     gload_read(gl);
 
     valstr = gcfg_get(gl->cfg, GLOAD_CFG_KEY_UPDATE);
