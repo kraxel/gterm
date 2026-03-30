@@ -39,6 +39,7 @@ static const gcfg_opt gload_opts[] = {
 /* ------------------------------------------------------------------------ */
 
 typedef struct gload {
+    GtkApplication *app;
     GtkWidget *window;
     GtkWidget *label;
     GtkWidget *graph;
@@ -190,7 +191,9 @@ static gboolean gload_draw(GtkWidget *widget, cairo_t *cr, gpointer data)
 
 static void gload_window_destroy(GtkWidget *widget, gpointer data)
 {
-    gtk_main_quit();
+    gload *gl = data;
+
+    g_application_quit(G_APPLICATION(gl->app));
 }
 
 static void gload_new(gload *gl)
@@ -200,7 +203,7 @@ static void gload_new(gload *gl)
     const char *label, *fontname, *highlight;
     char *markup;
 
-    gl->window = gtk_window_new(GTK_WINDOW_TOPLEVEL);
+    gl->window = gtk_application_window_new(gl->app);
     g_signal_connect(G_OBJECT(gl->window), "destroy",
                      G_CALLBACK(gload_window_destroy), gl);
 
@@ -236,6 +239,14 @@ static void gload_new(gload *gl)
     gtk_box_pack_start(GTK_BOX(vbox), gl->graph, true, true, 0);
 
     gtk_widget_show_all(gl->window);
+}
+
+static void gload_activate(GApplication *app, gpointer data)
+{
+    gload *gl = data;
+
+    gload_new(gl);
+    gload_read(gl);
 }
 
 int main(int argc, char *argv[])
@@ -276,14 +287,13 @@ int main(int argc, char *argv[])
 
     gl = g_new0(gload, 1);
     gl->cfg = cfg;
-
-    gload_new(gl);
-    gload_read(gl);
+    gl->app = gtk_application_new("org.kraxel.gload", G_APPLICATION_NON_UNIQUE);
+    g_signal_connect(gl->app, "activate", G_CALLBACK(gload_activate), gl);
 
     valstr = gcfg_get(gl->cfg, GLOAD_CFG_KEY_UPDATE);
     value = valstr ? atoi(valstr) : 10;
     g_timeout_add_seconds(value, gload_timer, gl);
 
-    gtk_main();
+    g_application_run(G_APPLICATION(gl->app), argc, argv);
     return 0;
 }
