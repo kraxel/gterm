@@ -430,7 +430,7 @@ static void gterm_new(gterm *gt)
     g_signal_connect(G_OBJECT(gt->terminal), "child-exited",
                      G_CALLBACK(gterm_vte_child_exited), gt);
 #if VTE_CHECK_VERSION(0, 78, 0)
-    g_signal_connect(G_OBJECT(gt->terminal), "termprop-changed::xterm-title",
+    g_signal_connect(G_OBJECT(gt->terminal), "termprop-changed::xterm.title",
                      G_CALLBACK(gterm_vte_termprop_changed), gt);
 #else
     g_signal_connect(G_OBJECT(gt->terminal), "window-title-changed",
