@@ -62,6 +62,7 @@ typedef struct gterm {
     GtkWidget *terminal;
     GtkWidget *popup;
 
+    GtkWidget *copy;
     GtkWidget *fullscreen;
     GtkWidget *bell;
     GSList *fontgrp;
@@ -151,6 +152,28 @@ static void gterm_vte_window_title_changed(VteTerminal *vteterminal,
 }
 #endif
 
+static gboolean gterm_vte_key_press(GtkWidget   *widget,
+                                    GdkEventKey *event,
+                                    gpointer     user_data)
+{
+    gterm *gt = user_data;
+    GdkModifierType mask = GDK_CONTROL_MASK | GDK_SHIFT_MASK;
+
+    if ((event->state & mask) == mask) {
+        switch (event->keyval) {
+        case GDK_KEY_C:
+        case GDK_KEY_c:
+            vte_terminal_copy_clipboard_format(VTE_TERMINAL(gt->terminal), VTE_FORMAT_TEXT);
+            return TRUE;
+        case GDK_KEY_V:
+        case GDK_KEY_v:
+            vte_terminal_paste_clipboard(VTE_TERMINAL(gt->terminal));
+            return TRUE;
+        }
+    }
+    return FALSE;
+}
+
 static void gterm_vte_gesture_pressed(GtkGestureMultiPress *gesture,
                                       gint                  n_press,
                                       gdouble               x,
@@ -180,6 +203,7 @@ static void gterm_vte_gesture_pressed(GtkGestureMultiPress *gesture,
         return;
 
     gtk_gesture_set_state(GTK_GESTURE(gesture), GTK_EVENT_SEQUENCE_CLAIMED);
+    gtk_widget_set_sensitive(gt->copy, vte_terminal_get_has_selection(VTE_TERMINAL(gt->terminal)));
     gtk_menu_popup_at_pointer(GTK_MENU(gt->popup), event);
 }
 
@@ -330,6 +354,22 @@ static void gterm_menu_font(GtkCheckMenuItem *item,
     gtk_window_resize(GTK_WINDOW(gt->window), nat.width, nat.height);
 }
 
+static void gterm_menu_copy(GtkMenuItem *item,
+                            gpointer user_data)
+{
+    gterm *gt = user_data;
+
+    vte_terminal_copy_clipboard_format(VTE_TERMINAL(gt->terminal), VTE_FORMAT_TEXT);
+}
+
+static void gterm_menu_paste(GtkMenuItem *item,
+                             gpointer user_data)
+{
+    gterm *gt = user_data;
+
+    vte_terminal_paste_clipboard(VTE_TERMINAL(gt->terminal));
+}
+
 static void gterm_menu_reset(GtkMenuItem *item,
                              gpointer user_data)
 {
@@ -354,6 +394,19 @@ static void gterm_fill_menu(gterm *gt)
     char *fontname;
     char *fontsize;
     int i;
+
+    gt->copy = gtk_menu_item_new_with_label("Copy");
+    g_signal_connect(G_OBJECT(gt->copy), "activate",
+                     G_CALLBACK(gterm_menu_copy), gt);
+    gtk_container_add(GTK_CONTAINER(gt->popup), gt->copy);
+
+    item = gtk_menu_item_new_with_label("Paste");
+    g_signal_connect(G_OBJECT(item), "activate",
+                     G_CALLBACK(gterm_menu_paste), gt);
+    gtk_container_add(GTK_CONTAINER(gt->popup), item);
+
+    item = gtk_separator_menu_item_new();
+    gtk_container_add(GTK_CONTAINER(gt->popup), item);
 
     gt->fullscreen = gtk_check_menu_item_new_with_label("Fullscreen");
     g_signal_connect(G_OBJECT(gt->fullscreen), "toggled",
@@ -442,6 +495,8 @@ static void gterm_new(gterm *gt)
     gtk_gesture_single_set_button(GTK_GESTURE_SINGLE(gesture), 0);
     g_signal_connect(gesture, "pressed",
                      G_CALLBACK(gterm_vte_gesture_pressed), gt);
+    g_signal_connect(G_OBJECT(gt->terminal), "key-press-event",
+                     G_CALLBACK(gterm_vte_key_press), gt);
     gtk_container_add(GTK_CONTAINER(gt->window), gt->terminal);
 
     gt->popup = gtk_menu_new();
