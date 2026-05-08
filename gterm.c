@@ -199,6 +199,20 @@ static void gterm_vte_gesture_pressed(GtkGestureMultiPress *gesture,
         return;
 
     button = gtk_gesture_single_get_current_button(GTK_GESTURE_SINGLE(gesture));
+    if (button == 1) {
+        char *url;
+        url = vte_terminal_hyperlink_check_event(VTE_TERMINAL(gt->terminal), (GdkEvent*)event);
+        if (!url) {
+            url = vte_terminal_match_check_event(VTE_TERMINAL(gt->terminal), (GdkEvent*)event, NULL);
+        }
+        if (url) {
+            gtk_show_uri_on_window(GTK_WINDOW(gt->window), url, gdk_event_get_time(event), NULL);
+            g_free(url);
+            gtk_gesture_set_state(GTK_GESTURE(gesture), GTK_EVENT_SEQUENCE_CLAIMED);
+            return;
+        }
+    }
+
     if (button < 1 || button > 3)
         return;
 
@@ -480,6 +494,17 @@ static void gterm_new(gterm *gt)
                      G_CALLBACK(gterm_window_destroy), gt);
 
     gt->terminal = vte_terminal_new();
+    vte_terminal_set_allow_hyperlink(VTE_TERMINAL(gt->terminal), TRUE);
+
+    VteRegex *url_regex;
+    GError *err = NULL;
+    url_regex = vte_regex_new_for_match("((https?|file)://|mailto:)[^\\s'\"<>]+",
+                                        -1, VTE_REGEX_FLAGS_DEFAULT, &err);
+    g_assert(url_regex != NULL);
+    int tag = vte_terminal_match_add_regex(VTE_TERMINAL(gt->terminal), url_regex, 0);
+    vte_terminal_match_set_cursor_name(VTE_TERMINAL(gt->terminal), tag, "pointer");
+    vte_regex_unref(url_regex);
+
     g_signal_connect(G_OBJECT(gt->terminal), "child-exited",
                      G_CALLBACK(gterm_vte_child_exited), gt);
 #if VTE_CHECK_VERSION(0, 78, 0)
