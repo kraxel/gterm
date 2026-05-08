@@ -395,19 +395,6 @@ static void gterm_fill_menu(gterm *gt)
     char *fontsize;
     int i;
 
-    gt->copy = gtk_menu_item_new_with_label("Copy");
-    g_signal_connect(G_OBJECT(gt->copy), "activate",
-                     G_CALLBACK(gterm_menu_copy), gt);
-    gtk_container_add(GTK_CONTAINER(gt->popup), gt->copy);
-
-    item = gtk_menu_item_new_with_label("Paste");
-    g_signal_connect(G_OBJECT(item), "activate",
-                     G_CALLBACK(gterm_menu_paste), gt);
-    gtk_container_add(GTK_CONTAINER(gt->popup), item);
-
-    item = gtk_separator_menu_item_new();
-    gtk_container_add(GTK_CONTAINER(gt->popup), item);
-
     gt->fullscreen = gtk_check_menu_item_new_with_label("Fullscreen");
     g_signal_connect(G_OBJECT(gt->fullscreen), "toggled",
                      G_CALLBACK(gterm_menu_fullscreen), gt);
@@ -417,6 +404,19 @@ static void gterm_fill_menu(gterm *gt)
     g_signal_connect(G_OBJECT(gt->bell), "toggled",
                      G_CALLBACK(gterm_menu_bell), gt);
     gtk_container_add(GTK_CONTAINER(gt->popup), gt->bell);
+
+    item = gtk_separator_menu_item_new();
+    gtk_container_add(GTK_CONTAINER(gt->popup), item);
+
+    gt->copy = gtk_menu_item_new_with_label("Copy");
+    g_signal_connect(G_OBJECT(gt->copy), "activate",
+                     G_CALLBACK(gterm_menu_copy), gt);
+    gtk_container_add(GTK_CONTAINER(gt->popup), gt->copy);
+
+    item = gtk_menu_item_new_with_label("Paste");
+    g_signal_connect(G_OBJECT(item), "activate",
+                     G_CALLBACK(gterm_menu_paste), gt);
+    gtk_container_add(GTK_CONTAINER(gt->popup), item);
 
     item = gtk_separator_menu_item_new();
     gtk_container_add(GTK_CONTAINER(gt->popup), item);
