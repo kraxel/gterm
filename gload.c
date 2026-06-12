@@ -216,7 +216,7 @@ static void gload_new(gload *gl)
         label = uts.nodename;
     }
     gl->label = gtk_label_new(label);
-    gtk_label_set_xalign(GTK_LABEL(gl->label), 0);
+    gtk_widget_set_halign(gl->label, GTK_ALIGN_START);
     gtk_box_pack_start(GTK_BOX(vbox), gl->label, false, false, 0);
 
     fontname = gcfg_get(gl->cfg, GLOAD_CFG_KEY_FONTNAME);

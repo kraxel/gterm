@@ -62,11 +62,6 @@ typedef struct gterm {
     GtkWidget *terminal;
     GtkWidget *popup;
 
-    GtkWidget *copy;
-    GtkWidget *fullscreen;
-    GtkWidget *bell;
-    GSList *fontgrp;
-
     GKeyFile *cfg;
     char **exec;
     GPid pid;
@@ -152,15 +147,17 @@ static void gterm_vte_window_title_changed(VteTerminal *vteterminal,
 }
 #endif
 
-static gboolean gterm_vte_key_press(GtkWidget   *widget,
-                                    GdkEventKey *event,
-                                    gpointer     user_data)
+static gboolean gterm_vte_key_pressed(GtkEventControllerKey *controller,
+                                      guint                  keyval,
+                                      guint                  keycode,
+                                      GdkModifierType        state,
+                                      gpointer               user_data)
 {
     gterm *gt = user_data;
     GdkModifierType mask = GDK_CONTROL_MASK | GDK_SHIFT_MASK;
 
-    if ((event->state & mask) == mask) {
-        switch (event->keyval) {
+    if ((state & mask) == mask) {
+        switch (keyval) {
         case GDK_KEY_C:
         case GDK_KEY_c:
             vte_terminal_copy_clipboard_format(VTE_TERMINAL(gt->terminal), VTE_FORMAT_TEXT);
@@ -217,84 +214,12 @@ static void gterm_vte_gesture_pressed(GtkGestureMultiPress *gesture,
         return;
 
     gtk_gesture_set_state(GTK_GESTURE(gesture), GTK_EVENT_SEQUENCE_CLAIMED);
-    gtk_widget_set_sensitive(gt->copy, vte_terminal_get_has_selection(VTE_TERMINAL(gt->terminal)));
+
+    GAction *copy = g_action_map_lookup_action(G_ACTION_MAP(gt->window), "copy");
+    g_simple_action_set_enabled(G_SIMPLE_ACTION(copy),
+                                vte_terminal_get_has_selection(VTE_TERMINAL(gt->terminal)));
+
     gtk_menu_popup_at_pointer(GTK_MENU(gt->popup), event);
-}
-
-static void gterm_vte_configure(gterm *gt)
-{
-    char *fontdesc;
-    char *fontname;
-    char *fontsize;
-    char *str;
-    gcfg_bool b;
-    gboolean state;
-    GdkRGBA color;
-    unsigned int cols, rows;
-
-    fontname = gcfg_get(gt->cfg, GTERM_CFG_KEY_FONT_FACE);
-    fontsize = gcfg_get(gt->cfg, GTERM_CFG_KEY_FONT_SIZE);
-    if (fontname && fontsize) {
-        fontdesc = g_strdup_printf("%s %s", fontname, fontsize);
-    } else if (fontname) {
-        fontdesc = g_strdup_printf("%s", fontname);
-    } else if (fontsize) {
-        fontdesc = g_strdup_printf("mono %s", fontsize);
-    } else {
-        fontdesc = NULL;
-    }
-    if (fontdesc) {
-        PangoFontDescription *font;
-        font = pango_font_description_from_string(fontdesc);
-        vte_terminal_set_font(VTE_TERMINAL(gt->terminal), font);
-        g_free(fontdesc);
-    }
-
-    str = gcfg_get(gt->cfg, GTERM_CFG_KEY_GEOMETRY);
-    if (str && sscanf(str, "%dx%d", &cols, &rows) == 2) {
-        vte_terminal_set_size(VTE_TERMINAL(gt->terminal), cols, rows);
-    }
-
-    b = gcfg_get_bool(gt->cfg, GTERM_CFG_KEY_CURSOR_BLINK);
-    if (b == GCFG_BOOL_TRUE) {
-        vte_terminal_set_cursor_blink_mode(VTE_TERMINAL(gt->terminal),
-                                           VTE_CURSOR_BLINK_ON);
-    } else if (b == GCFG_BOOL_FALSE) {
-        vte_terminal_set_cursor_blink_mode(VTE_TERMINAL(gt->terminal),
-                                           VTE_CURSOR_BLINK_OFF);
-    }
-
-    b = gcfg_get_bool(gt->cfg, GTERM_CFG_KEY_VISUAL_BELL);
-    if (b == GCFG_BOOL_TRUE) {
-        state = false;
-    } else if (b == GCFG_BOOL_FALSE) {
-        state = true;
-    } else {
-        state = vte_terminal_get_audible_bell(VTE_TERMINAL(gt->terminal));
-    }
-    gtk_check_menu_item_set_active(GTK_CHECK_MENU_ITEM(gt->bell), state);
-    vte_terminal_set_audible_bell(VTE_TERMINAL(gt->terminal), state);
-
-    str = gcfg_get(gt->cfg, GTERM_CFG_KEY_CURSOR_COLOR);
-    if (str) {
-        gdk_rgba_parse(&color, str);
-        vte_terminal_set_color_cursor(VTE_TERMINAL(gt->terminal), &color);
-    }
-    str = gcfg_get(gt->cfg, GTERM_CFG_KEY_FOREGROUND);
-    if (str) {
-        gdk_rgba_parse(&color, str);
-        vte_terminal_set_color_foreground(VTE_TERMINAL(gt->terminal), &color);
-    }
-    str = gcfg_get(gt->cfg, GTERM_CFG_KEY_BACKGROUND);
-    if (str) {
-        gdk_rgba_parse(&color, str);
-        vte_terminal_set_color_background(VTE_TERMINAL(gt->terminal), &color);
-    }
-    str = gcfg_get(gt->cfg, GTERM_CFG_KEY_SCROLLBACK_LINES);
-    if (str) {
-        vte_terminal_set_scrollback_lines(VTE_TERMINAL(gt->terminal),
-                                          atoi(str));
-    }
 }
 
 static void gterm_vte_geometry_hints(gterm *gt)
@@ -318,78 +243,145 @@ static void gterm_vte_geometry_hints(gterm *gt)
                                   GDK_HINT_BASE_SIZE);
 }
 
+static void gterm_vte_configure(gterm *gt)
+{
+    char *fontdesc;
+    char *fontname;
+    char *fontsize;
+    char *str;
+    gcfg_bool b;
+    GdkRGBA color;
+    unsigned int cols, rows;
+
+    fontname = gcfg_get(gt->cfg, GTERM_CFG_KEY_FONT_FACE);
+    fontsize = gcfg_get(gt->cfg, GTERM_CFG_KEY_FONT_SIZE);
+    if (fontname && fontsize) {
+        fontdesc = g_strdup_printf("%s %s", fontname, fontsize);
+    } else if (fontname) {
+        fontdesc = g_strdup_printf("%s", fontname);
+    } else if (fontsize) {
+        fontdesc = g_strdup_printf("mono %s", fontsize);
+    } else {
+        fontdesc = NULL;
+    }
+    if (fontdesc) {
+        PangoFontDescription *font;
+        font = pango_font_description_from_string(fontdesc);
+        vte_terminal_set_font(VTE_TERMINAL(gt->terminal), font);
+        g_free(fontdesc);
+        pango_font_description_free(font);
+    }
+
+    str = gcfg_get(gt->cfg, GTERM_CFG_KEY_GEOMETRY);
+    if (str && sscanf(str, "%dx%d", &cols, &rows) == 2) {
+        vte_terminal_set_size(VTE_TERMINAL(gt->terminal), cols, rows);
+    }
+
+    b = gcfg_get_bool(gt->cfg, GTERM_CFG_KEY_CURSOR_BLINK);
+    if (b == GCFG_BOOL_TRUE) {
+        vte_terminal_set_cursor_blink_mode(VTE_TERMINAL(gt->terminal),
+                                           VTE_CURSOR_BLINK_ON);
+    } else if (b == GCFG_BOOL_FALSE) {
+        vte_terminal_set_cursor_blink_mode(VTE_TERMINAL(gt->terminal),
+                                           VTE_CURSOR_BLINK_OFF);
+    }
+
+    str = gcfg_get(gt->cfg, GTERM_CFG_KEY_CURSOR_COLOR);
+    if (str) {
+        gdk_rgba_parse(&color, str);
+        vte_terminal_set_color_cursor(VTE_TERMINAL(gt->terminal), &color);
+    }
+    str = gcfg_get(gt->cfg, GTERM_CFG_KEY_FOREGROUND);
+    if (str) {
+        gdk_rgba_parse(&color, str);
+        vte_terminal_set_color_foreground(VTE_TERMINAL(gt->terminal), &color);
+    }
+    str = gcfg_get(gt->cfg, GTERM_CFG_KEY_BACKGROUND);
+    if (str) {
+        gdk_rgba_parse(&color, str);
+        vte_terminal_set_color_background(VTE_TERMINAL(gt->terminal), &color);
+    }
+    str = gcfg_get(gt->cfg, GTERM_CFG_KEY_SCROLLBACK_LINES);
+    if (str) {
+        vte_terminal_set_scrollback_lines(VTE_TERMINAL(gt->terminal),
+                                          atoi(str));
+    }
+}
+
 /* ------------------------------------------------------------------------ */
 
-static void gterm_menu_fullscreen(GtkCheckMenuItem *item,
-                                  gpointer user_data)
+static void gterm_action_copy(GSimpleAction *action, GVariant *parameter, gpointer user_data)
 {
     gterm *gt = user_data;
+    vte_terminal_copy_clipboard_format(VTE_TERMINAL(gt->terminal), VTE_FORMAT_TEXT);
+}
 
-    if (gtk_check_menu_item_get_active(item)) {
+static void gterm_action_paste(GSimpleAction *action, GVariant *parameter, gpointer user_data)
+{
+    gterm *gt = user_data;
+    vte_terminal_paste_clipboard(VTE_TERMINAL(gt->terminal));
+}
+
+static void gterm_action_reset(GSimpleAction *action, GVariant *parameter, gpointer user_data)
+{
+    gterm *gt = user_data;
+    vte_terminal_reset(VTE_TERMINAL(gt->terminal), true, true);
+}
+
+static void gterm_action_fullscreen(GSimpleAction *action, GVariant *state, gpointer user_data)
+{
+    gterm *gt = user_data;
+    gboolean active;
+
+    if (state) {
+        active = g_variant_get_boolean(state);
+    } else {
+        GVariant *current = g_action_get_state(G_ACTION(action));
+        active = !g_variant_get_boolean(current);
+        g_variant_unref(current);
+    }
+
+    if (active) {
         gtk_window_fullscreen(GTK_WINDOW(gt->window));
     } else {
         gtk_window_unfullscreen(GTK_WINDOW(gt->window));
     }
+    g_simple_action_set_state(action, g_variant_new_boolean(active));
 }
 
-static void gterm_menu_bell(GtkCheckMenuItem *item,
-                            gpointer user_data)
+static void gterm_action_bell(GSimpleAction *action, GVariant *state, gpointer user_data)
 {
     gterm *gt = user_data;
-    gboolean state;
+    gboolean active;
 
-    state = gtk_check_menu_item_get_active(item);
-    vte_terminal_set_audible_bell(VTE_TERMINAL(gt->terminal), state);
+    if (state) {
+        active = g_variant_get_boolean(state);
+    } else {
+        GVariant *current = g_action_get_state(G_ACTION(action));
+        active = !g_variant_get_boolean(current);
+        g_variant_unref(current);
+    }
+
+    vte_terminal_set_audible_bell(VTE_TERMINAL(gt->terminal), active);
+    g_simple_action_set_state(action, g_variant_new_boolean(active));
 }
 
-static void gterm_menu_font(GtkCheckMenuItem *item,
-                            gpointer user_data)
+static void gterm_action_font(GSimpleAction *action, GVariant *state, gpointer user_data)
 {
     gterm *gt = user_data;
+    const char *fontdesc = g_variant_get_string(state, NULL);
     PangoFontDescription *font;
-    gboolean state;
-    const char *name;
     GtkRequisition min, nat;
 
-    state = gtk_check_menu_item_get_active(item);
-    if (!state)
-        return;
-
-    name = gtk_menu_item_get_label(GTK_MENU_ITEM(item));
-    font = pango_font_description_from_string(name);
+    font = pango_font_description_from_string(fontdesc);
     vte_terminal_set_font(VTE_TERMINAL(gt->terminal), font);
     gterm_vte_geometry_hints(gt);
 
-    /*
-     * Force window resize.  Not sure why this is needed, shouldn't
-     * the window automatically respond to terminal size requests?
-     */
     gtk_widget_get_preferred_size(GTK_WIDGET(gt->terminal), &min, &nat);
     gtk_window_resize(GTK_WINDOW(gt->window), nat.width, nat.height);
-}
 
-static void gterm_menu_copy(GtkMenuItem *item,
-                            gpointer user_data)
-{
-    gterm *gt = user_data;
-
-    vte_terminal_copy_clipboard_format(VTE_TERMINAL(gt->terminal), VTE_FORMAT_TEXT);
-}
-
-static void gterm_menu_paste(GtkMenuItem *item,
-                             gpointer user_data)
-{
-    gterm *gt = user_data;
-
-    vte_terminal_paste_clipboard(VTE_TERMINAL(gt->terminal));
-}
-
-static void gterm_menu_reset(GtkMenuItem *item,
-                             gpointer user_data)
-{
-    gterm *gt = user_data;
-
-    vte_terminal_reset(VTE_TERMINAL(gt->terminal), true, true);
+    g_simple_action_set_state(action, state);
+    pango_font_description_free(font);
 }
 
 static void gterm_fill_menu(gterm *gt)
@@ -403,38 +395,27 @@ static void gterm_fill_menu(gterm *gt)
         GTERM_CFG_KEY_FONT_SIZE_5,
         GTERM_CFG_KEY_FONT_SIZE_6,
     };
-    GtkWidget *item;
+    GMenu *menu, *section;
     char *fontdesc;
     char *fontname;
     char *fontsize;
     int i;
 
-    gt->fullscreen = gtk_check_menu_item_new_with_label("Fullscreen");
-    g_signal_connect(G_OBJECT(gt->fullscreen), "toggled",
-                     G_CALLBACK(gterm_menu_fullscreen), gt);
-    gtk_container_add(GTK_CONTAINER(gt->popup), gt->fullscreen);
+    menu = g_menu_new();
 
-    gt->bell = gtk_check_menu_item_new_with_label("Audible bell");
-    g_signal_connect(G_OBJECT(gt->bell), "toggled",
-                     G_CALLBACK(gterm_menu_bell), gt);
-    gtk_container_add(GTK_CONTAINER(gt->popup), gt->bell);
+    section = g_menu_new();
+    g_menu_append(section, "Fullscreen", "win.fullscreen");
+    g_menu_append(section, "Audible bell", "win.bell");
+    g_menu_append_section(menu, NULL, G_MENU_MODEL(section));
+    g_object_unref(section);
 
-    item = gtk_separator_menu_item_new();
-    gtk_container_add(GTK_CONTAINER(gt->popup), item);
+    section = g_menu_new();
+    g_menu_append(section, "Copy", "win.copy");
+    g_menu_append(section, "Paste", "win.paste");
+    g_menu_append_section(menu, NULL, G_MENU_MODEL(section));
+    g_object_unref(section);
 
-    gt->copy = gtk_menu_item_new_with_label("Copy");
-    g_signal_connect(G_OBJECT(gt->copy), "activate",
-                     G_CALLBACK(gterm_menu_copy), gt);
-    gtk_container_add(GTK_CONTAINER(gt->popup), gt->copy);
-
-    item = gtk_menu_item_new_with_label("Paste");
-    g_signal_connect(G_OBJECT(item), "activate",
-                     G_CALLBACK(gterm_menu_paste), gt);
-    gtk_container_add(GTK_CONTAINER(gt->popup), item);
-
-    item = gtk_separator_menu_item_new();
-    gtk_container_add(GTK_CONTAINER(gt->popup), item);
-
+    section = g_menu_new();
     fontname = gcfg_get(gt->cfg, GTERM_CFG_KEY_FONT_FACE);
     if (!fontname)
         fontname = "monospace";
@@ -443,23 +424,22 @@ static void gterm_fill_menu(gterm *gt)
         if (!fontsize)
             continue;
         fontdesc = g_strdup_printf("%s %s", fontname, fontsize);
-        item = gtk_radio_menu_item_new_with_label(gt->fontgrp, fontdesc);
-        gt->fontgrp = gtk_radio_menu_item_get_group(GTK_RADIO_MENU_ITEM(item));
-        g_signal_connect(G_OBJECT(item), "toggled",
-                         G_CALLBACK(gterm_menu_font), gt);
-        gtk_container_add(GTK_CONTAINER(gt->popup), item);
+        char *target = g_strdup_printf("win.font::%s", fontdesc);
+        g_menu_append(section, fontdesc, target);
+        g_free(target);
         g_free(fontdesc);
     }
+    g_menu_append_section(menu, NULL, G_MENU_MODEL(section));
+    g_object_unref(section);
 
-    item = gtk_separator_menu_item_new();
-    gtk_container_add(GTK_CONTAINER(gt->popup), item);
+    section = g_menu_new();
+    g_menu_append(section, "Terminal reset", "win.reset");
+    g_menu_append_section(menu, NULL, G_MENU_MODEL(section));
+    g_object_unref(section);
 
-    item = gtk_menu_item_new_with_label("Terminal reset");
-    g_signal_connect(G_OBJECT(item), "activate",
-                     G_CALLBACK(gterm_menu_reset), gt);
-    gtk_container_add(GTK_CONTAINER(gt->popup), item);
-
-    gtk_widget_show_all(gt->popup);
+    gt->popup = gtk_menu_new_from_model(G_MENU_MODEL(menu));
+    gtk_menu_attach_to_widget(GTK_MENU(gt->popup), gt->terminal, NULL);
+    g_object_unref(menu);
 }
 
 /* ------------------------------------------------------------------------ */
@@ -483,7 +463,17 @@ static void gterm_window_configure(gterm *gt)
 
     b = gcfg_get_bool(gt->cfg, GTERM_CFG_KEY_FULLSCREEN);
     if (b == GCFG_BOOL_TRUE) {
-        gtk_check_menu_item_set_active(GTK_CHECK_MENU_ITEM(gt->fullscreen), true);
+        GAction *action = g_action_map_lookup_action(G_ACTION_MAP(gt->window), "fullscreen");
+        g_action_activate(action, g_variant_new_boolean(TRUE));
+    }
+
+    b = gcfg_get_bool(gt->cfg, GTERM_CFG_KEY_VISUAL_BELL);
+    if (b == GCFG_BOOL_TRUE) {
+        GAction *action = g_action_map_lookup_action(G_ACTION_MAP(gt->window), "bell");
+        g_action_activate(action, g_variant_new_boolean(TRUE));
+    } else if (b == GCFG_BOOL_FALSE) {
+        GAction *action = g_action_map_lookup_action(G_ACTION_MAP(gt->window), "bell");
+        g_action_activate(action, g_variant_new_boolean(FALSE));
     }
 }
 
@@ -520,11 +510,22 @@ static void gterm_new(gterm *gt)
     gtk_gesture_single_set_button(GTK_GESTURE_SINGLE(gesture), 0);
     g_signal_connect(gesture, "pressed",
                      G_CALLBACK(gterm_vte_gesture_pressed), gt);
-    g_signal_connect(G_OBJECT(gt->terminal), "key-press-event",
-                     G_CALLBACK(gterm_vte_key_press), gt);
+    GtkEventController *key_controller = gtk_event_controller_key_new(gt->terminal);
+    g_signal_connect(key_controller, "key-pressed",
+                     G_CALLBACK(gterm_vte_key_pressed), gt);
     gtk_container_add(GTK_CONTAINER(gt->window), gt->terminal);
 
-    gt->popup = gtk_menu_new();
+    static const GActionEntry entries[] = {
+        { "copy",       gterm_action_copy       },
+        { "paste",      gterm_action_paste      },
+        { "reset",      gterm_action_reset      },
+        { "fullscreen", gterm_action_fullscreen, NULL, "false", NULL },
+        { "bell",       gterm_action_bell,       NULL, "false", NULL },
+        { "font",       NULL, "s",  "''",    gterm_action_font       },
+    };
+    g_action_map_add_action_entries(G_ACTION_MAP(gt->window), entries,
+                                    G_N_ELEMENTS(entries), gt);
+
     gterm_fill_menu(gt);
 
     gterm_window_configure(gt);
