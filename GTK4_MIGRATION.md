@@ -47,3 +47,13 @@ This document outlines the GTK3 APIs currently used in the project that are depr
 1. **Adopt GAction**: Move menu logic to `GAction` to simplify the transition to `GMenu`.
 2. **UI Files**: Consider using `.ui` files (GtkBuilder) for layouts to make the transition easier.
 3. **VTE Update**: Ensure you are using a version of VTE that supports GTK4.
+
+## GTK3-Compatible Modernizations
+
+The following changes can be implemented while still targeting GTK3, which will significantly reduce the effort required for the final GTK4 transition:
+
+- **GAction & GMenu**: You can replace `GtkMenuItem` logic with `GAction` and `GMenu` models. In GTK3, a `GMenu` can be displayed using `gtk_menu_new_from_model(model)`.
+- **GtkGesture**: The project already uses `GtkGestureMultiPress` in `gterm.c`. Most standard gestures are available in GTK3 (since 3.14) and are the preferred way to handle input.
+- **Event Controllers**: `GtkEventControllerKey` and others are available in GTK 3.24. Transitioning from signal handlers (like `key-press-event`) to controllers can be done now.
+- **Alignment Properties**: Using `gtk_widget_set_halign()` and `gtk_widget_set_valign()` is supported in GTK3 and is the primary way to control positioning in GTK4 (replacing many packing properties and `xalign`/`yalign` fields).
+- **Surface-less Drawing**: While the "draw" signal is still used in GTK3, ensuring that your drawing code is independent of the widget's internal state (using only the passed `cairo_t`) makes moving to `gtk_drawing_area_set_draw_func` trivial.
