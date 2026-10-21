@@ -14,12 +14,12 @@ The project currently uses **GTK 3** (`gtk+-3.0`) and **VTE 2.91** (`vte-2.91`).
 
 The following items can be refactored right now in GTK 3 without breaking compatibility or requiring GTK 4:
 
-### 1.1 VTE Window Title Signal (`window-title-changed` -> `termprop-changed::xterm.title`)
+### 1.1 VTE Window Title Signal (`window-title-changed` -> `termprop-changed::xterm-title`)
 - **Location**: `gterm.c:132`, `gterm.c:514`
 - **Current GTK 3 Code**:
   ```c
   #if VTE_CHECK_VERSION(0, 78, 0)
-      g_signal_connect(G_OBJECT(gt->terminal), "termprop-changed::xterm.title",
+      g_signal_connect(G_OBJECT(gt->terminal), "termprop-changed::xterm-title",
                        G_CALLBACK(gterm_vte_termprop_changed), gt);
   #else
       g_signal_connect(G_OBJECT(gt->terminal), "window-title-changed",
@@ -28,7 +28,7 @@ The following items can be refactored right now in GTK 3 without breaking compat
   ```
 - **Modernization in GTK 3**:
   - In VTE 0.78+, the `window-title-changed` signal and `window-title` property are deprecated in favor of terminal properties (`termprop`).
-  - The fallback `#if VTE_CHECK_VERSION(0, 78, 0)` is already implemented in `gterm.c`, but when targeting modern VTE 0.78+, using `termprop-changed::xterm.title` exclusively is recommended.
+  - The fallback `#if VTE_CHECK_VERSION(0, 78, 0)` is already implemented in `gterm.c`, using `termprop-changed::xterm-title`.
 
 ### 1.2 `gtk_show_uri_on_window`
 - **Location**: `gterm.c:202`
@@ -93,7 +93,7 @@ The following changes **cannot** be fully converted in GTK 3 because the GTK 4 r
 |---|---|---|:---:|
 | **Context Menu** | `GtkMenu` + `gtk_menu_popup_at_pointer` | `GMenu` + `GAction` + `gtk_menu_new_from_model` / `GtkPopoverMenu` | **Yes** |
 | **Key Event Signals** | `"key-press-event"` | `GtkEventControllerKey` (`"key-pressed"`) | **Yes** |
-| **VTE Title Signal** | `"window-title-changed"` | `"termprop-changed::xterm.title"` (VTE 0.78+) | **Yes** |
+| **VTE Title Signal** | `"window-title-changed"` | `"termprop-changed::xterm-title"` (VTE 0.78+) | **Yes** |
 | **URI Opening** | `gtk_show_uri_on_window()` | `gtk_show_uri_on_window()` / `g_app_info_launch_default_for_uri` | **Yes** |
 | **Widget Showing** | `gtk_widget_show_all()` | `gtk_widget_show()` / explicit child visibility | **Yes** |
 | **Label Alignment** | `gtk_label_set_xalign()` | `gtk_widget_set_halign()` | **Yes** |
