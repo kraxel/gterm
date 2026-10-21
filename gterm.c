@@ -71,7 +71,6 @@ typedef struct gterm {
     char **exec;
     GPid pid;
     gint exit_code;
-    gboolean has_custom_title;
 } gterm;
 
 static void gterm_spawn_cb(VteTerminal *terminal, GPid pid,
@@ -137,9 +136,6 @@ static void gterm_vte_termprop_changed(VteTerminal *vteterminal,
     gterm *gt = user_data;
     const char *str;
 
-    if (gt->has_custom_title)
-        return;
-
     str = vte_terminal_get_termprop_string(vteterminal, name, NULL);
     if (str && *str)
         gtk_window_set_title(GTK_WINDOW(gt->window), str);
@@ -150,9 +146,6 @@ static void gterm_vte_window_title_changed(VteTerminal *vteterminal,
 {
     gterm *gt = user_data;
     char *str = NULL;
-
-    if (gt->has_custom_title)
-        return;
 
     g_object_get(G_OBJECT(vteterminal), "window-title", &str, NULL);
     if (str) {
@@ -489,10 +482,8 @@ static void gterm_window_configure(gterm *gt)
 
     str = gcfg_get(gt->cfg, GTERM_CFG_KEY_TITLE);
     if (str) {
-        if (*str) {
+        if (*str)
             gtk_window_set_title(GTK_WINDOW(gt->window), str);
-            gt->has_custom_title = TRUE;
-        }
         g_free(str);
     }
 
@@ -555,8 +546,10 @@ static void gterm_activate(GApplication *app, gpointer data)
     gterm_new(gt);
 
     if (gt->exec) {
-        if (!gt->has_custom_title && gt->exec[0])
+        char *str = gcfg_get(gt->cfg, GTERM_CFG_KEY_TITLE);
+        if (!str && gt->exec[0])
             gtk_window_set_title(GTK_WINDOW(gt->window), gt->exec[0]);
+        g_free(str);
         gterm_spawn(gt, gt->exec);
     } else {
         gterm_spawn_shell(gt);
