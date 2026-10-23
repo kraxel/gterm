@@ -128,7 +128,6 @@ static void gterm_vte_child_exited(VteTerminal *vteterminal,
     g_application_quit(G_APPLICATION(gt->app));
 }
 
-#if VTE_CHECK_VERSION(0, 78, 0)
 static void gterm_vte_termprop_changed(VteTerminal *vteterminal,
                                        const char   *name,
                                        gpointer     user_data)
@@ -140,20 +139,6 @@ static void gterm_vte_termprop_changed(VteTerminal *vteterminal,
     if (str)
         gtk_window_set_title(GTK_WINDOW(gt->window), str);
 }
-#else
-static void gterm_vte_window_title_changed(VteTerminal *vteterminal,
-                                           gpointer     user_data)
-{
-    gterm *gt = user_data;
-    char *str = NULL;
-
-    g_object_get(vteterminal, "window-title", &str, NULL);
-    if (str) {
-        gtk_window_set_title(GTK_WINDOW(gt->window), str);
-        g_free(str);
-    }
-}
-#endif
 
 static gboolean gterm_vte_key_press(GtkWidget   *widget,
                                     GdkEventKey *event,
@@ -529,13 +514,8 @@ static void gterm_new(gterm *gt)
 
     g_signal_connect(G_OBJECT(gt->terminal), "child-exited",
                      G_CALLBACK(gterm_vte_child_exited), gt);
-#if VTE_CHECK_VERSION(0, 78, 0)
     g_signal_connect(G_OBJECT(gt->terminal), "termprop-changed::xterm.title",
                      G_CALLBACK(gterm_vte_termprop_changed), gt);
-#else
-    g_signal_connect(G_OBJECT(gt->terminal), "window-title-changed",
-                     G_CALLBACK(gterm_vte_window_title_changed), gt);
-#endif
 
     GtkGesture *gesture = gtk_gesture_multi_press_new(gt->terminal);
     gtk_event_controller_set_propagation_phase(GTK_EVENT_CONTROLLER(gesture),
