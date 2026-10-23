@@ -137,8 +137,7 @@ static void gterm_vte_termprop_changed(VteTerminal *vteterminal,
     const char *str;
 
     str = vte_terminal_get_termprop_string(vteterminal, name, NULL);
-    if (str && *str)
-        gtk_window_set_title(GTK_WINDOW(gt->window), str);
+    gtk_window_set_title(GTK_WINDOW(gt->window), (str && *str) ? str : "gterm");
 }
 #else
 static void gterm_vte_window_title_changed(VteTerminal *vteterminal,
@@ -148,11 +147,8 @@ static void gterm_vte_window_title_changed(VteTerminal *vteterminal,
     char *str = NULL;
 
     g_object_get(G_OBJECT(vteterminal), "window-title", &str, NULL);
-    if (str) {
-        if (*str)
-            gtk_window_set_title(GTK_WINDOW(gt->window), str);
-        g_free(str);
-    }
+    gtk_window_set_title(GTK_WINDOW(gt->window), (str && *str) ? str : "gterm");
+    g_free(str);
 }
 #endif
 
@@ -514,7 +510,7 @@ static void gterm_new(gterm *gt)
     g_signal_connect(G_OBJECT(gt->terminal), "child-exited",
                      G_CALLBACK(gterm_vte_child_exited), gt);
 #if VTE_CHECK_VERSION(0, 78, 0)
-    g_signal_connect(G_OBJECT(gt->terminal), "termprop-changed::xterm-title",
+    g_signal_connect(G_OBJECT(gt->terminal), "termprop-changed::xterm.title",
                      G_CALLBACK(gterm_vte_termprop_changed), gt);
 #else
     g_signal_connect(G_OBJECT(gt->terminal), "window-title-changed",
