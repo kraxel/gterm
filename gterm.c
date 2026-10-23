@@ -62,10 +62,10 @@ typedef struct gterm {
     GtkWidget *terminal;
     GtkWidget *popup;
 
-    GtkWidget *copy;
-    GtkWidget *fullscreen;
-    GtkWidget *bell;
-    GSList *fontgrp;
+    GSimpleAction *copy_action;
+    GSimpleAction *fullscreen_action;
+    GSimpleAction *bell_action;
+    GSimpleAction *font_action;
 
     GKeyFile *cfg;
     char **exec;
@@ -128,6 +128,7 @@ static void gterm_vte_child_exited(VteTerminal *vteterminal,
     g_application_quit(G_APPLICATION(gt->app));
 }
 
+#if VTE_CHECK_VERSION(0, 78, 0)
 static void gterm_vte_termprop_changed(VteTerminal *vteterminal,
                                        const char   *name,
                                        gpointer     user_data)
@@ -136,8 +137,23 @@ static void gterm_vte_termprop_changed(VteTerminal *vteterminal,
     const char *str;
 
     str = vte_terminal_get_termprop_string(vteterminal, name, NULL);
-    gtk_window_set_title(GTK_WINDOW(gt->window), str);
+    if (str)
+        gtk_window_set_title(GTK_WINDOW(gt->window), str);
 }
+#else
+static void gterm_vte_window_title_changed(VteTerminal *vteterminal,
+                                           gpointer     user_data)
+{
+    gterm *gt = user_data;
+    char *str = NULL;
+
+    g_object_get(vteterminal, "window-title", &str, NULL);
+    if (str) {
+        gtk_window_set_title(GTK_WINDOW(gt->window), str);
+        g_free(str);
+    }
+}
+#endif
 
 static gboolean gterm_vte_key_press(GtkWidget   *widget,
                                     GdkEventKey *event,
@@ -204,7 +220,7 @@ static void gterm_vte_gesture_pressed(GtkGestureMultiPress *gesture,
         return;
 
     gtk_gesture_set_state(GTK_GESTURE(gesture), GTK_EVENT_SEQUENCE_CLAIMED);
-    gtk_widget_set_sensitive(gt->copy, vte_terminal_get_has_selection(VTE_TERMINAL(gt->terminal)));
+    g_simple_action_set_enabled(gt->copy_action, vte_terminal_get_has_selection(VTE_TERMINAL(gt->terminal)));
     gtk_menu_popup_at_pointer(GTK_MENU(gt->popup), event);
 }
 
@@ -234,6 +250,8 @@ static void gterm_vte_configure(gterm *gt)
         PangoFontDescription *font;
         font = pango_font_description_from_string(fontdesc);
         vte_terminal_set_font(VTE_TERMINAL(gt->terminal), font);
+        pango_font_description_free(font);
+        g_simple_action_set_state(gt->font_action, g_variant_new_string(fontdesc));
         g_free(fontdesc);
     }
 
@@ -259,7 +277,7 @@ static void gterm_vte_configure(gterm *gt)
     } else {
         state = vte_terminal_get_audible_bell(VTE_TERMINAL(gt->terminal));
     }
-    gtk_check_menu_item_set_active(GTK_CHECK_MENU_ITEM(gt->bell), state);
+    g_simple_action_set_state(gt->bell_action, g_variant_new_boolean(state));
     vte_terminal_set_audible_bell(VTE_TERMINAL(gt->terminal), state);
 
     str = gcfg_get(gt->cfg, GTERM_CFG_KEY_CURSOR_COLOR);
@@ -307,44 +325,44 @@ static void gterm_vte_geometry_hints(gterm *gt)
 
 /* ------------------------------------------------------------------------ */
 
-static void gterm_menu_fullscreen(GtkCheckMenuItem *item,
-                                  gpointer user_data)
+static void gterm_action_fullscreen(GSimpleAction *action,
+                                    GVariant      *state,
+                                    gpointer       user_data)
 {
     gterm *gt = user_data;
+    gboolean fullscreen = g_variant_get_boolean(state);
 
-    if (gtk_check_menu_item_get_active(item)) {
+    if (fullscreen) {
         gtk_window_fullscreen(GTK_WINDOW(gt->window));
     } else {
         gtk_window_unfullscreen(GTK_WINDOW(gt->window));
     }
+    g_simple_action_set_state(action, state);
 }
 
-static void gterm_menu_bell(GtkCheckMenuItem *item,
-                            gpointer user_data)
+static void gterm_action_bell(GSimpleAction *action,
+                              GVariant      *state,
+                              gpointer       user_data)
 {
     gterm *gt = user_data;
-    gboolean state;
+    gboolean state_bool = g_variant_get_boolean(state);
 
-    state = gtk_check_menu_item_get_active(item);
-    vte_terminal_set_audible_bell(VTE_TERMINAL(gt->terminal), state);
+    vte_terminal_set_audible_bell(VTE_TERMINAL(gt->terminal), state_bool);
+    g_simple_action_set_state(action, state);
 }
 
-static void gterm_menu_font(GtkCheckMenuItem *item,
-                            gpointer user_data)
+static void gterm_action_font(GSimpleAction *action,
+                              GVariant      *state,
+                              gpointer       user_data)
 {
     gterm *gt = user_data;
+    const char *name = g_variant_get_string(state, NULL);
     PangoFontDescription *font;
-    gboolean state;
-    const char *name;
     GtkRequisition min, nat;
 
-    state = gtk_check_menu_item_get_active(item);
-    if (!state)
-        return;
-
-    name = gtk_menu_item_get_label(GTK_MENU_ITEM(item));
     font = pango_font_description_from_string(name);
     vte_terminal_set_font(VTE_TERMINAL(gt->terminal), font);
+    pango_font_description_free(font);
     gterm_vte_geometry_hints(gt);
 
     /*
@@ -353,26 +371,31 @@ static void gterm_menu_font(GtkCheckMenuItem *item,
      */
     gtk_widget_get_preferred_size(GTK_WIDGET(gt->terminal), &min, &nat);
     gtk_window_resize(GTK_WINDOW(gt->window), nat.width, nat.height);
+
+    g_simple_action_set_state(action, state);
 }
 
-static void gterm_menu_copy(GtkMenuItem *item,
-                            gpointer user_data)
+static void gterm_action_copy(GSimpleAction *action,
+                              GVariant      *parameter,
+                              gpointer       user_data)
 {
     gterm *gt = user_data;
 
     vte_terminal_copy_clipboard_format(VTE_TERMINAL(gt->terminal), VTE_FORMAT_TEXT);
 }
 
-static void gterm_menu_paste(GtkMenuItem *item,
-                             gpointer user_data)
+static void gterm_action_paste(GSimpleAction *action,
+                               GVariant      *parameter,
+                               gpointer       user_data)
 {
     gterm *gt = user_data;
 
     vte_terminal_paste_clipboard(VTE_TERMINAL(gt->terminal));
 }
 
-static void gterm_menu_reset(GtkMenuItem *item,
-                             gpointer user_data)
+static void gterm_action_reset(GSimpleAction *action,
+                               GVariant      *parameter,
+                               gpointer       user_data)
 {
     gterm *gt = user_data;
 
@@ -390,38 +413,50 @@ static void gterm_fill_menu(gterm *gt)
         GTERM_CFG_KEY_FONT_SIZE_5,
         GTERM_CFG_KEY_FONT_SIZE_6,
     };
-    GtkWidget *item;
     char *fontdesc;
     char *fontname;
     char *fontsize;
     int i;
 
-    gt->fullscreen = gtk_check_menu_item_new_with_label("Fullscreen");
-    g_signal_connect(G_OBJECT(gt->fullscreen), "toggled",
-                     G_CALLBACK(gterm_menu_fullscreen), gt);
-    gtk_container_add(GTK_CONTAINER(gt->popup), gt->fullscreen);
+    gt->fullscreen_action = g_simple_action_new_stateful("fullscreen", NULL, g_variant_new_boolean(FALSE));
+    g_signal_connect(gt->fullscreen_action, "change-state", G_CALLBACK(gterm_action_fullscreen), gt);
+    g_action_map_add_action(G_ACTION_MAP(gt->window), G_ACTION(gt->fullscreen_action));
 
-    gt->bell = gtk_check_menu_item_new_with_label("Audible bell");
-    g_signal_connect(G_OBJECT(gt->bell), "toggled",
-                     G_CALLBACK(gterm_menu_bell), gt);
-    gtk_container_add(GTK_CONTAINER(gt->popup), gt->bell);
+    gt->bell_action = g_simple_action_new_stateful("bell", NULL, g_variant_new_boolean(TRUE));
+    g_signal_connect(gt->bell_action, "change-state", G_CALLBACK(gterm_action_bell), gt);
+    g_action_map_add_action(G_ACTION_MAP(gt->window), G_ACTION(gt->bell_action));
 
-    item = gtk_separator_menu_item_new();
-    gtk_container_add(GTK_CONTAINER(gt->popup), item);
+    gt->copy_action = g_simple_action_new("copy", NULL);
+    g_signal_connect(gt->copy_action, "activate", G_CALLBACK(gterm_action_copy), gt);
+    g_action_map_add_action(G_ACTION_MAP(gt->window), G_ACTION(gt->copy_action));
 
-    gt->copy = gtk_menu_item_new_with_label("Copy");
-    g_signal_connect(G_OBJECT(gt->copy), "activate",
-                     G_CALLBACK(gterm_menu_copy), gt);
-    gtk_container_add(GTK_CONTAINER(gt->popup), gt->copy);
+    GSimpleAction *paste_action = g_simple_action_new("paste", NULL);
+    g_signal_connect(paste_action, "activate", G_CALLBACK(gterm_action_paste), gt);
+    g_action_map_add_action(G_ACTION_MAP(gt->window), G_ACTION(paste_action));
 
-    item = gtk_menu_item_new_with_label("Paste");
-    g_signal_connect(G_OBJECT(item), "activate",
-                     G_CALLBACK(gterm_menu_paste), gt);
-    gtk_container_add(GTK_CONTAINER(gt->popup), item);
+    gt->font_action = g_simple_action_new_stateful("font", G_VARIANT_TYPE_STRING, g_variant_new_string(""));
+    g_signal_connect(gt->font_action, "change-state", G_CALLBACK(gterm_action_font), gt);
+    g_action_map_add_action(G_ACTION_MAP(gt->window), G_ACTION(gt->font_action));
 
-    item = gtk_separator_menu_item_new();
-    gtk_container_add(GTK_CONTAINER(gt->popup), item);
+    GSimpleAction *reset_action = g_simple_action_new("reset", NULL);
+    g_signal_connect(reset_action, "activate", G_CALLBACK(gterm_action_reset), gt);
+    g_action_map_add_action(G_ACTION_MAP(gt->window), G_ACTION(reset_action));
 
+    GMenu *menu = g_menu_new();
+
+    GMenu *s1 = g_menu_new();
+    g_menu_append(s1, "Fullscreen", "win.fullscreen");
+    g_menu_append(s1, "Audible bell", "win.bell");
+    g_menu_append_section(menu, NULL, G_MENU_MODEL(s1));
+    g_object_unref(s1);
+
+    GMenu *s2 = g_menu_new();
+    g_menu_append(s2, "Copy", "win.copy");
+    g_menu_append(s2, "Paste", "win.paste");
+    g_menu_append_section(menu, NULL, G_MENU_MODEL(s2));
+    g_object_unref(s2);
+
+    GMenu *s3 = g_menu_new();
     fontname = gcfg_get(gt->cfg, GTERM_CFG_KEY_FONT_FACE);
     if (!fontname)
         fontname = "monospace";
@@ -430,23 +465,23 @@ static void gterm_fill_menu(gterm *gt)
         if (!fontsize)
             continue;
         fontdesc = g_strdup_printf("%s %s", fontname, fontsize);
-        item = gtk_radio_menu_item_new_with_label(gt->fontgrp, fontdesc);
-        gt->fontgrp = gtk_radio_menu_item_get_group(GTK_RADIO_MENU_ITEM(item));
-        g_signal_connect(G_OBJECT(item), "toggled",
-                         G_CALLBACK(gterm_menu_font), gt);
-        gtk_container_add(GTK_CONTAINER(gt->popup), item);
+        GMenuItem *item = g_menu_item_new(fontdesc, NULL);
+        g_menu_item_set_action_and_target(item, "win.font", "s", fontdesc);
+        g_menu_append_item(s3, item);
+        g_object_unref(item);
         g_free(fontdesc);
     }
+    g_menu_append_section(menu, NULL, G_MENU_MODEL(s3));
+    g_object_unref(s3);
 
-    item = gtk_separator_menu_item_new();
-    gtk_container_add(GTK_CONTAINER(gt->popup), item);
+    GMenu *s4 = g_menu_new();
+    g_menu_append(s4, "Terminal reset", "win.reset");
+    g_menu_append_section(menu, NULL, G_MENU_MODEL(s4));
+    g_object_unref(s4);
 
-    item = gtk_menu_item_new_with_label("Terminal reset");
-    g_signal_connect(G_OBJECT(item), "activate",
-                     G_CALLBACK(gterm_menu_reset), gt);
-    gtk_container_add(GTK_CONTAINER(gt->popup), item);
-
-    gtk_widget_show_all(gt->popup);
+    gt->popup = gtk_menu_new_from_model(G_MENU_MODEL(menu));
+    gtk_menu_attach_to_widget(GTK_MENU(gt->popup), gt->window, NULL);
+    g_object_unref(menu);
 }
 
 /* ------------------------------------------------------------------------ */
@@ -470,7 +505,7 @@ static void gterm_window_configure(gterm *gt)
 
     b = gcfg_get_bool(gt->cfg, GTERM_CFG_KEY_FULLSCREEN);
     if (b == GCFG_BOOL_TRUE) {
-        gtk_check_menu_item_set_active(GTK_CHECK_MENU_ITEM(gt->fullscreen), true);
+        g_action_group_change_action_state(G_ACTION_GROUP(gt->window), "fullscreen", g_variant_new_boolean(TRUE));
     }
 }
 
@@ -494,8 +529,13 @@ static void gterm_new(gterm *gt)
 
     g_signal_connect(G_OBJECT(gt->terminal), "child-exited",
                      G_CALLBACK(gterm_vte_child_exited), gt);
+#if VTE_CHECK_VERSION(0, 78, 0)
     g_signal_connect(G_OBJECT(gt->terminal), "termprop-changed::xterm.title",
                      G_CALLBACK(gterm_vte_termprop_changed), gt);
+#else
+    g_signal_connect(G_OBJECT(gt->terminal), "window-title-changed",
+                     G_CALLBACK(gterm_vte_window_title_changed), gt);
+#endif
 
     GtkGesture *gesture = gtk_gesture_multi_press_new(gt->terminal);
     gtk_event_controller_set_propagation_phase(GTK_EVENT_CONTROLLER(gesture),
@@ -507,7 +547,6 @@ static void gterm_new(gterm *gt)
                      G_CALLBACK(gterm_vte_key_press), gt);
     gtk_container_add(GTK_CONTAINER(gt->window), gt->terminal);
 
-    gt->popup = gtk_menu_new();
     gterm_fill_menu(gt);
 
     gterm_window_configure(gt);
