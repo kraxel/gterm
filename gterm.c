@@ -573,6 +573,10 @@ int main(int argc, char *argv[])
     gt = g_new0(gterm, 1);
     gt->cfg = cfg;
     if (eopt) {
+        if (eopt == argc) {
+            fprintf(stderr, "missing command to execute\n");
+            exit(1);
+        }
         gt->exec = argv + eopt;
     }
     gt->app = gtk_application_new("org.kraxel.gterm", G_APPLICATION_NON_UNIQUE);
