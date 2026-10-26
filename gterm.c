@@ -390,6 +390,14 @@ static void gterm_action_reset(GSimpleAction *action,
     vte_terminal_reset(VTE_TERMINAL(gt->terminal), true, true);
 }
 
+static void gterm_popdown_cb(GAction *action, GVariant *param, gpointer user_data)
+{
+    gterm *gt = user_data;
+
+    if (gt->popup)
+        gtk_popover_popdown(GTK_POPOVER(gt->popup));
+}
+
 static void gterm_fill_menu(gterm *gt)
 {
     static const char *sizes[] = {
@@ -408,26 +416,32 @@ static void gterm_fill_menu(gterm *gt)
 
     gt->fullscreen_action = g_simple_action_new_stateful("fullscreen", NULL, g_variant_new_boolean(FALSE));
     g_signal_connect(gt->fullscreen_action, "change-state", G_CALLBACK(gterm_action_fullscreen), gt);
+    g_signal_connect(gt->fullscreen_action, "change-state", G_CALLBACK(gterm_popdown_cb), gt);
     g_action_map_add_action(G_ACTION_MAP(gt->window), G_ACTION(gt->fullscreen_action));
 
     gt->bell_action = g_simple_action_new_stateful("bell", NULL, g_variant_new_boolean(TRUE));
     g_signal_connect(gt->bell_action, "change-state", G_CALLBACK(gterm_action_bell), gt);
+    g_signal_connect(gt->bell_action, "change-state", G_CALLBACK(gterm_popdown_cb), gt);
     g_action_map_add_action(G_ACTION_MAP(gt->window), G_ACTION(gt->bell_action));
 
     gt->copy_action = g_simple_action_new("copy", NULL);
     g_signal_connect(gt->copy_action, "activate", G_CALLBACK(gterm_action_copy), gt);
+    g_signal_connect(gt->copy_action, "activate", G_CALLBACK(gterm_popdown_cb), gt);
     g_action_map_add_action(G_ACTION_MAP(gt->window), G_ACTION(gt->copy_action));
 
     GSimpleAction *paste_action = g_simple_action_new("paste", NULL);
     g_signal_connect(paste_action, "activate", G_CALLBACK(gterm_action_paste), gt);
+    g_signal_connect(paste_action, "activate", G_CALLBACK(gterm_popdown_cb), gt);
     g_action_map_add_action(G_ACTION_MAP(gt->window), G_ACTION(paste_action));
 
     gt->font_action = g_simple_action_new_stateful("font", G_VARIANT_TYPE_STRING, g_variant_new_string(""));
     g_signal_connect(gt->font_action, "change-state", G_CALLBACK(gterm_action_font), gt);
+    g_signal_connect(gt->font_action, "change-state", G_CALLBACK(gterm_popdown_cb), gt);
     g_action_map_add_action(G_ACTION_MAP(gt->window), G_ACTION(gt->font_action));
 
     GSimpleAction *reset_action = g_simple_action_new("reset", NULL);
     g_signal_connect(reset_action, "activate", G_CALLBACK(gterm_action_reset), gt);
+    g_signal_connect(reset_action, "activate", G_CALLBACK(gterm_popdown_cb), gt);
     g_action_map_add_action(G_ACTION_MAP(gt->window), G_ACTION(reset_action));
 
     GMenu *menu = g_menu_new();
@@ -468,6 +482,7 @@ static void gterm_fill_menu(gterm *gt)
     g_object_unref(s4);
 
     gt->popup = gtk_popover_new_from_model(gt->terminal, G_MENU_MODEL(menu));
+    gtk_popover_set_modal(GTK_POPOVER(gt->popup), TRUE);
     g_object_unref(menu);
 }
 
