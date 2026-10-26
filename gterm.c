@@ -204,9 +204,12 @@ static void gterm_vte_gesture_pressed(GtkGestureMultiPress *gesture,
     if (button < 1 || button > 3)
         return;
 
+    GdkRectangle rect = { .x = (int)x, .y = (int)y, .width = 1, .height = 1 };
+
     gtk_gesture_set_state(GTK_GESTURE(gesture), GTK_EVENT_SEQUENCE_CLAIMED);
     g_simple_action_set_enabled(gt->copy_action, vte_terminal_get_has_selection(VTE_TERMINAL(gt->terminal)));
-    gtk_menu_popup_at_pointer(GTK_MENU(gt->popup), event);
+    gtk_popover_set_pointing_to(GTK_POPOVER(gt->popup), &rect);
+    gtk_popover_popup(GTK_POPOVER(gt->popup));
 }
 
 static void gterm_vte_configure(gterm *gt)
@@ -464,8 +467,7 @@ static void gterm_fill_menu(gterm *gt)
     g_menu_append_section(menu, NULL, G_MENU_MODEL(s4));
     g_object_unref(s4);
 
-    gt->popup = gtk_menu_new_from_model(G_MENU_MODEL(menu));
-    gtk_menu_attach_to_widget(GTK_MENU(gt->popup), gt->window, NULL);
+    gt->popup = gtk_popover_new_from_model(gt->terminal, G_MENU_MODEL(menu));
     g_object_unref(menu);
 }
 
