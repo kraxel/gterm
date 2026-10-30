@@ -149,6 +149,18 @@ static gboolean gterm_vte_key_pressed(GtkEventControllerKey *controller,
     gterm *gt = user_data;
     GdkModifierType mask = GDK_CONTROL_MASK | GDK_SHIFT_MASK;
 
+    if (keyval == GDK_KEY_F11) {
+        GAction *action = g_action_map_lookup_action(G_ACTION_MAP(gt->window), "fullscreen");
+        if (action) {
+            GVariant *current_state = g_action_get_state(action);
+            gboolean fullscreen = g_variant_get_boolean(current_state);
+            g_action_group_change_action_state(G_ACTION_GROUP(gt->window), "fullscreen",
+                                                g_variant_new_boolean(!fullscreen));
+            g_variant_unref(current_state);
+        }
+        return TRUE;
+    }
+
     if ((state & mask) == mask) {
         switch (keyval) {
         case GDK_KEY_C:
