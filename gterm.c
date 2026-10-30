@@ -128,6 +128,7 @@ static void gterm_vte_child_exited(VteTerminal *vteterminal,
     g_application_quit(G_APPLICATION(gt->app));
 }
 
+#if VTE_CHECK_VERSION(0, 78, 0)
 static void gterm_vte_termprop_changed(VteTerminal *vteterminal,
                                        const char   *name,
                                        gpointer     user_data)
@@ -139,16 +140,32 @@ static void gterm_vte_termprop_changed(VteTerminal *vteterminal,
     if (str)
         gtk_window_set_title(GTK_WINDOW(gt->window), str);
 }
+#else
+static void gterm_vte_window_title_changed(VteTerminal *vteterminal,
+                                           gpointer     user_data)
+{
+    gterm *gt = user_data;
+    char *str = NULL;
 
-static gboolean gterm_vte_key_press(GtkWidget   *widget,
-                                    GdkEventKey *event,
-                                    gpointer     user_data)
+    g_object_get(G_OBJECT(vteterminal), "window-title", &str, NULL);
+    if (str) {
+        gtk_window_set_title(GTK_WINDOW(gt->window), str);
+        g_free(str);
+    }
+}
+#endif
+
+static gboolean gterm_vte_key_pressed(GtkEventControllerKey *controller,
+                                     guint                  keyval,
+                                     guint                  keycode,
+                                     GdkModifierType        state,
+                                     gpointer               user_data)
 {
     gterm *gt = user_data;
     GdkModifierType mask = GDK_CONTROL_MASK | GDK_SHIFT_MASK;
 
-    if ((event->state & mask) == mask) {
-        switch (event->keyval) {
+    if ((state & mask) == mask) {
+        switch (keyval) {
         case GDK_KEY_C:
         case GDK_KEY_c:
             vte_terminal_copy_clipboard_format(VTE_TERMINAL(gt->terminal), VTE_FORMAT_TEXT);
@@ -531,8 +548,13 @@ static void gterm_new(gterm *gt)
 
     g_signal_connect(G_OBJECT(gt->terminal), "child-exited",
                      G_CALLBACK(gterm_vte_child_exited), gt);
+#if VTE_CHECK_VERSION(0, 78, 0)
     g_signal_connect(G_OBJECT(gt->terminal), "termprop-changed::xterm.title",
                      G_CALLBACK(gterm_vte_termprop_changed), gt);
+#else
+    g_signal_connect(G_OBJECT(gt->terminal), "window-title-changed",
+                     G_CALLBACK(gterm_vte_window_title_changed), gt);
+#endif
 
     GtkGesture *gesture = gtk_gesture_multi_press_new(gt->terminal);
     gtk_event_controller_set_propagation_phase(GTK_EVENT_CONTROLLER(gesture),
@@ -540,8 +562,13 @@ static void gterm_new(gterm *gt)
     gtk_gesture_single_set_button(GTK_GESTURE_SINGLE(gesture), 0);
     g_signal_connect(gesture, "pressed",
                      G_CALLBACK(gterm_vte_gesture_pressed), gt);
-    g_signal_connect(G_OBJECT(gt->terminal), "key-press-event",
-                     G_CALLBACK(gterm_vte_key_press), gt);
+
+    GtkEventController *key_controller = gtk_event_controller_key_new(gt->terminal);
+    gtk_event_controller_set_propagation_phase(key_controller,
+                                               GTK_PHASE_TARGET);
+    g_signal_connect(key_controller, "key-pressed",
+                     G_CALLBACK(gterm_vte_key_pressed), gt);
+
     gtk_container_add(GTK_CONTAINER(gt->window), gt->terminal);
 
     gterm_fill_menu(gt);
