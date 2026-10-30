@@ -458,17 +458,25 @@ static void gterm_fill_menu(gterm *gt)
     g_signal_connect(reset_action, "activate", G_CALLBACK(gterm_popdown_cb), gt);
     g_action_map_add_action(G_ACTION_MAP(gt->window), G_ACTION(reset_action));
 
+    const char *fullscreen_accels[] = { "F11", NULL };
+    const char *copy_accels[] = { "<Primary><Shift>c", NULL };
+    const char *paste_accels[] = { "<Primary><Shift>v", NULL };
+
+    gtk_application_set_accels_for_action(gt->app, "win.fullscreen", fullscreen_accels);
+    gtk_application_set_accels_for_action(gt->app, "win.copy", copy_accels);
+    gtk_application_set_accels_for_action(gt->app, "win.paste", paste_accels);
+
     GMenu *menu = g_menu_new();
 
     GMenu *s1 = g_menu_new();
-    g_menu_append(s1, "Fullscreen", "win.fullscreen");
+    g_menu_append(s1, "Fullscreen (F11)", "win.fullscreen");
     g_menu_append(s1, "Audible bell", "win.bell");
     g_menu_append_section(menu, NULL, G_MENU_MODEL(s1));
     g_object_unref(s1);
 
     GMenu *s2 = g_menu_new();
-    g_menu_append(s2, "Copy", "win.copy");
-    g_menu_append(s2, "Paste", "win.paste");
+    g_menu_append(s2, "Copy (Ctrl+Shift+C)", "win.copy");
+    g_menu_append(s2, "Paste (Ctrl+Shift+V)", "win.paste");
     g_menu_append_section(menu, NULL, G_MENU_MODEL(s2));
     g_object_unref(s2);
 
