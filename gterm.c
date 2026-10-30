@@ -543,9 +543,9 @@ static void gterm_new(gterm *gt)
     g_signal_connect(gesture, "pressed",
                      G_CALLBACK(gterm_vte_gesture_pressed), gt);
 
-    GtkEventController *key_controller = gtk_event_controller_key_new(gt->terminal);
+    GtkEventController *key_controller = gtk_event_controller_key_new(gt->window);
     gtk_event_controller_set_propagation_phase(key_controller,
-                                               GTK_PHASE_TARGET);
+                                               GTK_PHASE_CAPTURE);
     g_signal_connect(key_controller, "key-pressed",
                      G_CALLBACK(gterm_vte_key_pressed), gt);
 
